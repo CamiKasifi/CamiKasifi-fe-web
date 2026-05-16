@@ -1,12 +1,25 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Fira_Sans, Fira_Code } from 'next/font/google'
 import './globals.css'
+import { AuthProvider } from '@/lib/auth'
 
-const inter = Inter({ subsets: ['latin'] })
+const firaSans = Fira_Sans({
+  subsets: ['latin', 'latin-ext'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-sans',
+  display: 'swap',
+})
+
+const firaCode = Fira_Code({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-mono',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
-  title: 'CamiKasifi - Cami Yönetim Sistemi',
-  description: 'Modern cami öğrenci ve ibadet yönetim sistemi',
+  title: 'CamiKaşifi Yönetim Paneli',
+  description: 'CamiKaşifi yönetici ve imam paneli',
 }
 
 export default function RootLayout({
@@ -15,9 +28,10 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="tr">
-      <body className={inter.className}>{children}</body>
+    <html lang="tr" className={`${firaSans.variable} ${firaCode.variable}`}>
+      <body>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   )
 }
-

@@ -20,6 +20,32 @@ export function formatDate(date: Date | string): string {
   })
 }
 
+export function formatDateTime(date: Date | string | null | undefined): string {
+  if (!date) return '—'
+  const d = typeof date === 'string' ? new Date(date) : date
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString('tr-TR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+const SALAH_LABEL: Record<string, string> = {
+  FAJR: 'Sabah',
+  DHUHR: 'Öğle',
+  ASR: 'İkindi',
+  MAGHRIB: 'Akşam',
+  ISHA: 'Yatsı',
+}
+
+export function salahLabel(type: string | null | undefined): string {
+  if (!type) return '—'
+  return SALAH_LABEL[type.toUpperCase()] ?? type
+}
+
 /**
  * Telefon numarası formatlama
  */
