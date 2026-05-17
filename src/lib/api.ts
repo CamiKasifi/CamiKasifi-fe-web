@@ -14,6 +14,19 @@ export interface UserProfile {
   surname: string
   birthday: string | null
   referralCode?: string | null
+  points?: number | null
+  phoneNumber?: string | null
+  phoneVisible?: boolean | null
+}
+
+export interface UserUpdateInput {
+  name: string
+  surname: string
+  birthday?: string | null
+  oldPassword: string
+  newPassword?: string | null
+  phoneNumber?: string | null
+  phoneVisible?: boolean | null
 }
 
 export interface AuthResponse {
@@ -32,6 +45,7 @@ export interface Mosque {
   radius: number
   latitude: number
   longitude: number
+  osmId?: number | null
 }
 
 export interface MosqueInput {
@@ -84,10 +98,172 @@ export interface ApprovalItem {
   type: ApprovalKind | string | null
   point: number | null
   createdAt: string | null
+  /** Faz 1B anti-cheat: oturuma toplanan flag CSV'si list olarak. */
+  suspiciousFlags?: string[] | null
+  /** Faz 1B: ardışık ping'lerden gözlenen pik hız (km/h). */
+  maxSpeedKmh?: number | null
+}
+
+export interface BulkApprovalError {
+  id: number
+  reason: string
+}
+
+export interface BulkApprovalResult {
+  succeeded: number
+  failed: number
+  succeededIds: number[]
+  errors: BulkApprovalError[]
+}
+
+/* ───── Faz 1A — Cami profili ───── */
+
+export interface MosqueImamInfo {
+  userId: number
+  name: string
+  surname: string
+  phone: string | null
+}
+
+export interface MosqueTopAttendee {
+  personId: number
+  name: string
+  surname: string
+  validSessionCount: number
+}
+
+export interface MosqueProfile {
+  id: number
+  name: string
+  city: string
+  district: string
+  neighbourhood: string
+  radius: number | null
+  latitude: number | null
+  longitude: number | null
+  historyText: string | null
+  photoUrl: string | null
+  imams: MosqueImamInfo[]
+  topAttendees: MosqueTopAttendee[]
+}
+
+export interface ImamMosqueProfileUpdateInput {
+  historyText?: string | null
+  photoUrl?: string | null
+  radius?: number | null
+}
+
+/* ───── Faz 3 — Duyuru / Etkinlik ───── */
+
+export type AnnouncementType =
+  | 'HUTBE'
+  | 'GENERAL'
+  | 'IFTAR'
+  | 'MEVLID'
+  | 'TAZIYE'
+  | 'OTHER'
+
+export interface MosqueAnnouncement {
+  id: number
+  mosqueId: number
+  authorId: number
+  authorName: string
+  authorSurname: string
+  type: AnnouncementType
+  title: string
+  body: string | null
+  eventAt: string | null
+  createdAt: string
+  pushedToCount: number | null
+}
+
+export interface MosqueAnnouncementCreateInput {
+  type: AnnouncementType
+  title: string
+  body?: string | null
+  eventAt?: string | null
+  notifyAttendees?: boolean
+}
+
+/* ───── Faz 3 — Cemaat analitiği ───── */
+
+export interface MosqueAnalytics {
+  mosqueId: number
+  windowDays: number
+  uniqueAttendees: number
+  totalValidSessions: number
+  bySalahType: Record<string, number>
+  byDayOfWeek: Record<string, number>
+  weakestSalahType: string | null
+  ageDistribution: Record<string, number>
+  visitFrequencyBuckets: Record<string, number>
+  topAttendees: MosqueTopAttendee[]
 }
 
 export type CompetitionRoleType = 'OWNER' | 'MANAGER' | 'APPROVER'
 export type CompetitionRoleStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+
+export type IncentiveRuleType =
+  | 'DAILY_SALAH'
+  | 'DAILY_ALL_SALAH'
+  | 'WEEKLY_SALAH_COUNT'
+
+/** Owner/manager view — direct mirror of `Incentive` JPA entity. */
+export interface Incentive {
+  id: number
+  title: string
+  description: string | null
+  rewardPoints: number
+  ruleType: IncentiveRuleType
+  targetSalahType: SalahType | null
+  targetCount: number | null
+  startsAt: string | null
+  endsAt: string | null
+  active: boolean
+}
+
+export interface IncentiveInput {
+  title: string
+  description?: string | null
+  ruleType: IncentiveRuleType
+  rewardPoints: number
+  targetSalahType?: SalahType | null
+  targetCount?: number | null
+  startsAt?: string | null
+  endsAt?: string | null
+  active?: boolean
+}
+
+/** Per-user incentive view returned inside the envelope from `/api/me/incentives`. */
+export interface IncentiveProgress {
+  id: number
+  competitionId: number
+  title: string
+  description: string | null
+  ruleType: IncentiveRuleType | string
+  rewardPoints: number
+  progress: number
+  target: number
+  completed: boolean
+  claimed: boolean
+  claimable: boolean
+  endsAt: string | null
+  period: string
+}
+
+export interface MyIncentivesResponse {
+  hasCompetition: boolean
+  competitionId: number | null
+  competitionName: string | null
+  items: IncentiveProgress[]
+}
+
+export interface IncentiveClaimResult {
+  incentiveId: number
+  claimedAt: string
+  bonusAwarded: number
+  totalPoints: number
+}
 
 export interface AdminUser {
   id: number
@@ -195,8 +371,36 @@ export const api = {
     }) => request<AuthResponse>('POST', '/api/auth/register', input),
     me: () => request<UserProfile>('GET', '/api/users/me'),
   },
+  users: {
+    update: (input: UserUpdateInput) =>
+      request<UserProfile>('PUT', '/api/users/me', input),
+  },
   mosques: {
     list: () => request<Mosque[]>('GET', '/api/mosques'),
+    profile: (id: number) =>
+      request<MosqueProfile>('GET', `/api/mosques/${id}/profile`),
+    announcements: (id: number) =>
+      request<MosqueAnnouncement[]>('GET', `/api/mosques/${id}/announcements`),
+    events: (id: number) =>
+      request<MosqueAnnouncement[]>('GET', `/api/mosques/${id}/events`),
+    search: (params: {
+      q?: string
+      city?: string
+      district?: string
+      limit?: number
+    }) => {
+      const usp = new URLSearchParams()
+      if (params.q && params.q.trim()) usp.set('q', params.q.trim())
+      if (params.city && params.city.trim()) usp.set('city', params.city.trim())
+      if (params.district && params.district.trim())
+        usp.set('district', params.district.trim())
+      if (params.limit != null) usp.set('limit', String(params.limit))
+      const qs = usp.toString()
+      return request<Mosque[]>(
+        'GET',
+        `/api/mosques/search${qs ? `?${qs}` : ''}`,
+      )
+    },
     create: (input: MosqueInput) =>
       request<Mosque>('POST', '/api/admin/mosques', input),
     update: (id: number, input: MosqueInput) =>
@@ -208,6 +412,29 @@ export const api = {
     list: () => request<Mosque[]>('GET', '/api/imams/me/mosques'),
     update: (mosqueIds: number[]) =>
       request<Mosque[]>('PUT', '/api/imams/me/mosques', { mosqueIds }),
+    updateProfile: (
+      mosqueId: number,
+      input: ImamMosqueProfileUpdateInput,
+    ) =>
+      request<Mosque>(
+        'PUT',
+        `/api/imams/me/mosques/${mosqueId}/profile`,
+        input,
+      ),
+    createAnnouncement: (
+      mosqueId: number,
+      input: MosqueAnnouncementCreateInput,
+    ) =>
+      request<MosqueAnnouncement>(
+        'POST',
+        `/api/imams/me/mosques/${mosqueId}/announcements`,
+        input,
+      ),
+    analytics: (mosqueId: number) =>
+      request<MosqueAnalytics>(
+        'GET',
+        `/api/imams/me/mosques/${mosqueId}/analytics`,
+      ),
   },
   adminUsers: {
     list: (type?: WebUserType) => {
@@ -238,6 +465,48 @@ export const api = {
       request<ApprovalItem>('POST', `/api/approvals/${id}/approve`, {}),
     reject: (id: number) =>
       request<ApprovalItem>('POST', `/api/approvals/${id}/reject`, {}),
+    bulkApprove: (ids: number[]) =>
+      request<BulkApprovalResult>('POST', '/api/approvals/bulk-approve', {
+        ids,
+      }),
+    bulkReject: (ids: number[]) =>
+      request<BulkApprovalResult>('POST', '/api/approvals/bulk-reject', {
+        ids,
+      }),
+  },
+  incentives: {
+    /** Cemaat'in (kendi yarışmasındaki) teşviklerini envelope olarak getir. */
+    myList: () => request<MyIncentivesResponse>('GET', '/api/me/incentives'),
+    claim: (id: number) =>
+      request<IncentiveClaimResult>(
+        'POST',
+        `/api/me/incentives/${id}/claim`,
+        {},
+      ),
+  },
+  competitionIncentives: {
+    list: (competitionId: number) =>
+      request<Incentive[]>(
+        'GET',
+        `/api/competitions/${competitionId}/incentives`,
+      ),
+    create: (competitionId: number, input: IncentiveInput) =>
+      request<Incentive>(
+        'POST',
+        `/api/competitions/${competitionId}/incentives`,
+        input,
+      ),
+    update: (competitionId: number, id: number, input: IncentiveInput) =>
+      request<Incentive>(
+        'PUT',
+        `/api/competitions/${competitionId}/incentives/${id}`,
+        input,
+      ),
+    remove: (competitionId: number, id: number) =>
+      request<void>(
+        'DELETE',
+        `/api/competitions/${competitionId}/incentives/${id}`,
+      ),
   },
   competitionRoles: {
     list: (competitionId: number) =>

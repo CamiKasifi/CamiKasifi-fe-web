@@ -5,22 +5,24 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer active:scale-[0.98]',
   {
     variants: {
       variant: {
-        primary: 'bg-accent text-accent-foreground hover:bg-accent-hover',
+        primary:
+          'bg-accent text-accent-foreground shadow-card hover:bg-accent-hover',
         secondary:
           'bg-surface text-foreground border border-border hover:bg-muted',
         ghost: 'text-foreground hover:bg-muted',
+        gold: 'bg-gold text-gold-foreground hover:bg-gold/90 shadow-card',
         destructive:
           'bg-destructive text-destructive-foreground hover:opacity-90',
       },
       size: {
         sm: 'h-8 px-3 text-xs',
-        md: 'h-9 px-4',
-        lg: 'h-10 px-6 text-base',
-        icon: 'h-9 w-9',
+        md: 'h-10 px-4',
+        lg: 'h-12 px-6 text-base',
+        icon: 'h-10 w-10',
       },
     },
     defaultVariants: { variant: 'primary', size: 'md' },
@@ -56,7 +58,7 @@ export function Card({
   return (
     <div
       className={cn(
-        'rounded-lg border border-border bg-surface shadow-soft',
+        'rounded-2xl border border-border bg-surface shadow-card',
         className,
       )}
       {...props}
@@ -126,7 +128,7 @@ export const Input = React.forwardRef<
   <input
     ref={ref}
     className={cn(
-      'flex h-9 w-full rounded-md border border-border bg-surface px-3 py-1 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50',
+      'flex h-10 w-full rounded-lg border border-border bg-surface px-3.5 py-1 text-[15px] text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50',
       className,
     )}
     {...props}
@@ -248,21 +250,25 @@ export function Stat({
   icon?: React.ComponentType<{ className?: string }>
 }) {
   return (
-    <Card className="p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+    <Card className="relative overflow-hidden p-4 sm:p-5">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gold/10"
+      />
+      <div className="relative flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             {label}
           </p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">
+          <p className="font-display mt-1.5 text-2xl font-bold tabular-nums text-foreground sm:text-3xl">
             {value}
           </p>
           {hint && (
-            <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+            <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>
           )}
         </div>
         {Icon && (
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-accent/10 text-accent">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent ring-1 ring-gold/25">
             <Icon className="h-4 w-4" />
           </div>
         )}
@@ -401,16 +407,18 @@ export function PageHeader({
   actions?: React.ReactNode
 }) {
   return (
-    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground sm:text-2xl">
+    <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
           {title}
         </h1>
         {description && (
           <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         )}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && (
+        <div className="flex flex-wrap items-center gap-2">{actions}</div>
+      )}
     </div>
   )
 }

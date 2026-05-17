@@ -4,51 +4,63 @@
 
 @layer base {
   :root {
-    --color-background: 248 250 252;
-    --color-surface: 255 255 255;
-    --color-foreground: 2 6 23;
-    --color-muted: 241 245 249;
-    --color-muted-foreground: 100 116 139;
-    --color-border: 226 232 240;
-    --color-ring: 15 23 42;
+    /* Parchment / mosque-interior palette */
+    --color-background: 247 242 232;
+    --color-surface: 253 250 244;
+    --color-foreground: 23 41 36;
+    --color-muted: 238 230 215;
+    --color-muted-foreground: 109 96 75;
+    --color-border: 225 213 191;
+    --color-ring: 11 78 65;
 
-    --color-primary: 15 23 42;
-    --color-primary-foreground: 248 250 252;
+    /* Deep mosque green */
+    --color-primary: 11 78 65;
+    --color-primary-foreground: 253 250 244;
 
-    --color-accent: 4 120 87;
-    --color-accent-foreground: 255 255 255;
-    --color-accent-hover: 6 95 70;
+    /* Brass / dome gold */
+    --color-accent: 11 78 65;
+    --color-accent-foreground: 253 250 244;
+    --color-accent-hover: 8 60 50;
 
-    --color-success: 22 163 74;
-    --color-success-foreground: 255 255 255;
-    --color-warning: 202 138 4;
-    --color-warning-foreground: 255 255 255;
-    --color-destructive: 220 38 38;
-    --color-destructive-foreground: 255 255 255;
+    /* Gold secondary (calligraphic) */
+    --color-gold: 180 134 64;
+    --color-gold-foreground: 253 250 244;
+    --color-gold-soft: 234 207 144;
+
+    --color-success: 21 128 61;
+    --color-success-foreground: 253 250 244;
+    --color-warning: 180 83 9;
+    --color-warning-foreground: 253 250 244;
+    --color-destructive: 185 28 28;
+    --color-destructive-foreground: 253 250 244;
   }
 
   .dark {
-    --color-background: 2 6 23;
-    --color-surface: 15 23 42;
-    --color-foreground: 248 250 252;
-    --color-muted: 30 41 59;
-    --color-muted-foreground: 148 163 184;
-    --color-border: 30 41 59;
-    --color-ring: 226 232 240;
+    --color-background: 14 26 23;
+    --color-surface: 22 38 33;
+    --color-foreground: 240 232 215;
+    --color-muted: 30 50 44;
+    --color-muted-foreground: 168 156 130;
+    --color-border: 38 60 52;
+    --color-ring: 211 175 109;
 
-    --color-primary: 248 250 252;
-    --color-primary-foreground: 15 23 42;
+    --color-primary: 240 232 215;
+    --color-primary-foreground: 14 26 23;
 
-    --color-accent: 16 185 129;
-    --color-accent-foreground: 2 6 23;
-    --color-accent-hover: 5 150 105;
+    --color-accent: 64 158 130;
+    --color-accent-foreground: 10 22 19;
+    --color-accent-hover: 80 178 148;
 
-    --color-success: 34 197 94;
-    --color-success-foreground: 2 6 23;
+    --color-gold: 211 175 109;
+    --color-gold-foreground: 14 26 23;
+    --color-gold-soft: 100 78 38;
+
+    --color-success: 74 192 117;
+    --color-success-foreground: 14 26 23;
     --color-warning: 234 179 8;
-    --color-warning-foreground: 2 6 23;
+    --color-warning-foreground: 14 26 23;
     --color-destructive: 248 113 113;
-    --color-destructive-foreground: 2 6 23;
+    --color-destructive-foreground: 14 26 23;
   }
 
   * {
@@ -64,7 +76,11 @@
 
   body {
     @apply bg-background text-foreground font-sans;
-    font-feature-settings: 'rlig' 1, 'calt' 1;
+    font-feature-settings: 'rlig' 1, 'calt' 1, 'ss01' 1;
+    /* Subtle Islamic 8-point star tessellation, drawn in gold/green at very low opacity */
+    background-image:
+      radial-gradient(ellipse 60% 40% at 50% -10%, rgb(var(--color-gold) / 0.08), transparent 60%),
+      url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='%230b4e41' stroke-opacity='0.06' stroke-width='1'%3E%3Cpath d='M40 4 L52 16 L68 16 L68 32 L80 40 L68 48 L68 64 L52 64 L40 76 L28 64 L12 64 L12 48 L0 40 L12 32 L12 16 L28 16 Z'/%3E%3Cpath d='M40 16 L60 36 L40 56 L20 36 Z'/%3E%3Ccircle cx='40' cy='40' r='6'/%3E%3C/g%3E%3C/svg%3E");
   }
 
   .tabular-nums {
@@ -84,5 +100,27 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+  }
+}
+
+@layer components {
+  /* Decorative arabesque divider — used in headers / login */
+  .arabesque-divider {
+    height: 14px;
+    background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 14' fill='none' stroke='%23b48640' stroke-width='1.2'%3E%3Cpath d='M0 7 H40 M80 7 H120'/%3E%3Cpath d='M50 7 Q55 1 60 7 Q65 13 70 7'/%3E%3Ccircle cx='60' cy='7' r='1.6' fill='%23b48640'/%3E%3C/svg%3E");
+    background-repeat: repeat-x;
+    background-position: center;
+  }
+
+  /* Mihrab arch — used as a frame on cards and hero */
+  .mihrab-arch {
+    border-top-left-radius: 9999px;
+    border-top-right-radius: 9999px;
+  }
+
+  /* Brand serif for headings + numeric stats */
+  .font-display {
+    font-family: var(--font-display), 'Amiri', Georgia, serif;
+    letter-spacing: -0.01em;
   }
 }
