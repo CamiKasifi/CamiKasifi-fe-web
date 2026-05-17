@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   BarChart3,
   Check,
+  Gift,
   Plus,
   ShieldCheck,
   Trophy,
   UserPlus,
   X,
 } from 'lucide-react'
+import { IncentivesPanel } from '@/components/IncentivesPanel'
 import {
   Badge,
   Button,
@@ -43,7 +45,7 @@ import {
   type Mosque,
 } from '@/lib/api'
 
-type Tab = 'leaderboard' | 'roles'
+type Tab = 'leaderboard' | 'roles' | 'incentives'
 
 const ROLE_LABEL: Record<CompetitionRoleType, string> = {
   OWNER: 'Sahip',
@@ -236,7 +238,7 @@ export default function CompetitionsPage() {
                 <div
                   role="tablist"
                   aria-label="Yarışma sekmeleri"
-                  className="mt-3 inline-flex rounded-md border border-border bg-muted/40 p-0.5"
+                  className="mt-3 inline-flex flex-wrap rounded-md border border-border bg-muted/40 p-0.5"
                 >
                   <TabButton
                     active={tab === 'leaderboard'}
@@ -252,6 +254,13 @@ export default function CompetitionsPage() {
                   >
                     Roller
                   </TabButton>
+                  <TabButton
+                    active={tab === 'incentives'}
+                    onClick={() => setTab('incentives')}
+                    icon={Gift}
+                  >
+                    Teşvikler
+                  </TabButton>
                 </div>
               )}
             </CardHeader>
@@ -263,12 +272,19 @@ export default function CompetitionsPage() {
                 </p>
               ) : tab === 'leaderboard' ? (
                 <LeaderboardTab competitionId={selectedCompetition.id} />
-              ) : (
+              ) : tab === 'roles' ? (
                 <RolesTab
                   competitionId={selectedCompetition.id}
                   imam={imam}
                   currentUserId={user?.id ?? null}
                   mosques={mosques}
+                />
+              ) : (
+                <IncentivesTab
+                  competitionId={selectedCompetition.id}
+                  imam={imam}
+                  admin={admin}
+                  currentUserId={user?.id ?? null}
                 />
               )}
             </CardContent>
@@ -869,5 +885,68 @@ function RolesTab({
         )}
       </Modal>
     </div>
+  )
+}
+
+function IncentivesTab({
+  competitionId,
+  imam,
+  admin,
+  currentUserId,
+}: {
+  competitionId: number
+  imam: boolean
+  admin: boolean
+  currentUserId: number | null
+}) {
+  const [canManage, setCanManage] = useState<boolean>(admin)
+  const [checkingRole, setCheckingRole] = useState<boolean>(!admin && imam)
+
+  useEffect(() => {
+    if (admin) {
+      setCanManage(true)
+      setCheckingRole(false)
+      return
+    }
+    if (!imam || currentUserId == null) {
+      setCanManage(false)
+      setCheckingRole(false)
+      return
+    }
+    let cancelled = false
+    setCheckingRole(true)
+    api.competitionRoles
+      .list(competitionId)
+      .then((rows) => {
+        if (cancelled) return
+        const mine = rows.some(
+          (r) =>
+            r.userId === currentUserId &&
+            r.status === 'APPROVED' &&
+            (r.type === 'OWNER' || r.type === 'MANAGER'),
+        )
+        setCanManage(mine)
+      })
+      .catch(() => {
+        if (!cancelled) setCanManage(false)
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingRole(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [competitionId, admin, imam, currentUserId])
+
+  if (checkingRole) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Spinner className="h-4 w-4" /> Yetki kontrol ediliyor…
+      </div>
+    )
+  }
+
+  return (
+    <IncentivesPanel competitionId={competitionId} canManage={canManage} />
   )
 }

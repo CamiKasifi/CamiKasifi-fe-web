@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, RefreshCw, X } from 'lucide-react'
+import { AlertTriangle, Check, Gauge, RefreshCw, X } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -34,6 +34,11 @@ const KIND_LABEL: Record<string, string> = {
   GUEST: 'Misafir',
 }
 
+const FLAG_LABEL: Record<string, string> = {
+  MOCK_LOCATION: 'Sahte konum',
+  ANOMALOUS_SPEED: 'Anormal hız',
+}
+
 function statusVariant(
   status: string,
 ): 'default' | 'success' | 'warning' | 'destructive' {
@@ -54,6 +59,9 @@ export default function ApprovalsPage() {
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('PENDING')
   const [acting, setActing] = useState<number | null>(null)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkInfo, setBulkInfo] = useState<string | null>(null)
 
   useEffect(() => {
     if (!authLoading && !imam) router.replace('/dashboard')
@@ -62,9 +70,11 @@ export default function ApprovalsPage() {
   const refresh = async () => {
     setLoading(true)
     setError(null)
+    setBulkInfo(null)
     try {
       const list = await api.approvals.list()
       setItems(list)
+      setSelected(new Set())
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Onaylar alınamadı.')
     } finally {
@@ -95,6 +105,42 @@ export default function ApprovalsPage() {
     return c
   }, [items])
 
+  const suspiciousCount = useMemo(
+    () =>
+      filtered.filter(
+        (i) =>
+          i.status?.toUpperCase() === 'PENDING' &&
+          i.suspiciousFlags &&
+          i.suspiciousFlags.length > 0,
+      ).length,
+    [filtered],
+  )
+
+  const pendingIdsInFiltered = useMemo(
+    () =>
+      filtered
+        .filter((i) => i.status?.toUpperCase() === 'PENDING')
+        .map((i) => i.id),
+    [filtered],
+  )
+
+  const toggleSelect = (id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selected.size === pendingIdsInFiltered.length) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(pendingIdsInFiltered))
+    }
+  }
+
   const act = async (item: ApprovalItem, kind: 'approve' | 'reject') => {
     setActing(item.id)
     setError(null)
@@ -109,7 +155,39 @@ export default function ApprovalsPage() {
     }
   }
 
+  const bulkAct = async (kind: 'approve' | 'reject') => {
+    if (selected.size === 0) return
+    const ids = Array.from(selected)
+    setBulkBusy(true)
+    setError(null)
+    setBulkInfo(null)
+    try {
+      const result =
+        kind === 'approve'
+          ? await api.approvals.bulkApprove(ids)
+          : await api.approvals.bulkReject(ids)
+      const parts: string[] = []
+      parts.push(`${result.succeeded} ${kind === 'approve' ? 'onaylandı' : 'reddedildi'}`)
+      if (result.failed > 0) {
+        parts.push(`${result.failed} başarısız`)
+      }
+      setBulkInfo(parts.join(', '))
+      await refresh()
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : 'Toplu işlem başarısız.',
+      )
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   if (!imam) return null
+
+  const showBulkBar =
+    filter === 'PENDING' && pendingIdsInFiltered.length > 0
+  const allSelected =
+    selected.size > 0 && selected.size === pendingIdsInFiltered.length
 
   return (
     <>
@@ -124,6 +202,11 @@ export default function ApprovalsPage() {
       />
 
       <ErrorBanner message={error} />
+      {bulkInfo && (
+        <div className="mb-4 rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-300">
+          {bulkInfo}
+        </div>
+      )}
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="w-44">
@@ -139,7 +222,47 @@ export default function ApprovalsPage() {
           </Select>
         </div>
         <Badge variant="default">{filtered.length} kayıt</Badge>
+        {suspiciousCount > 0 && (
+          <Badge variant="destructive">
+            <AlertTriangle className="mr-1 inline h-3 w-3" />
+            {suspiciousCount} şüpheli
+          </Badge>
+        )}
       </div>
+
+      {showBulkBar && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
+          <span className="text-muted-foreground">
+            {selected.size} / {pendingIdsInFiltered.length} seçili
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={toggleSelectAll}
+          >
+            {allSelected ? 'Seçimi kaldır' : 'Tümünü seç'}
+          </Button>
+          <span className="flex-1" />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => bulkAct('reject')}
+            loading={bulkBusy}
+            disabled={selected.size === 0}
+            className="text-destructive hover:bg-destructive/10"
+          >
+            <X className="h-4 w-4" /> Toplu reddet
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => bulkAct('approve')}
+            loading={bulkBusy}
+            disabled={selected.size === 0}
+          >
+            <Check className="h-4 w-4" /> Toplu onayla
+          </Button>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -162,12 +285,14 @@ export default function ApprovalsPage() {
         <Table>
           <THead>
             <TR>
+              {showBulkBar && <TH className="w-8" />}
               <TH>Kullanıcı</TH>
               <TH>Yarışma</TH>
               <TH>Namaz</TH>
               <TH>Cami</TH>
               <TH>Tip</TH>
               <TH>Tarih</TH>
+              <TH>Şüpheli</TH>
               <TH>Durum</TH>
               <TH className="text-right">İşlem</TH>
             </TR>
@@ -183,8 +308,30 @@ export default function ApprovalsPage() {
                 (item.personId != null ? `#${item.personId}` : '—')
               const kindRaw = (item.type ?? '').toString().toUpperCase()
               const kindLabel = KIND_LABEL[kindRaw] ?? kindRaw ?? '—'
+              const flags = item.suspiciousFlags ?? []
+              const suspicious = isPending && flags.length > 0
               return (
-                <TR key={item.id}>
+                <TR
+                  key={item.id}
+                  className={
+                    suspicious
+                      ? 'bg-destructive/5'
+                      : undefined
+                  }
+                >
+                  {showBulkBar && (
+                    <TD>
+                      {isPending ? (
+                        <input
+                          type="checkbox"
+                          checked={selected.has(item.id)}
+                          onChange={() => toggleSelect(item.id)}
+                          aria-label={`#${item.id} seç`}
+                          className="h-4 w-4 cursor-pointer"
+                        />
+                      ) : null}
+                    </TD>
+                  )}
                   <TD>
                     <div className="flex flex-col">
                       <span className="font-medium">{fullName}</span>
@@ -213,6 +360,26 @@ export default function ApprovalsPage() {
                   </TD>
                   <TD className="text-xs text-muted-foreground">
                     {formatDateTime(item.sessionStartTime ?? item.createdAt)}
+                  </TD>
+                  <TD>
+                    {flags.length === 0 ? (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        {flags.map((f) => (
+                          <Badge key={f} variant="destructive">
+                            <AlertTriangle className="mr-1 inline h-3 w-3" />
+                            {FLAG_LABEL[f] ?? f}
+                          </Badge>
+                        ))}
+                        {item.maxSpeedKmh != null && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground tabular-nums">
+                            <Gauge className="h-3 w-3" />
+                            pik {Math.round(item.maxSpeedKmh)} km/h
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </TD>
                   <TD>
                     <Badge variant={statusVariant(item.status ?? '')}>
