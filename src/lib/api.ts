@@ -1,9 +1,12 @@
 // HTTP client + types matching CamiKasifi-backend DTOs.
+//
+// Auth: token Supabase session'undan dinamik okunur (supabaseClient singleton'ı).
+// JWT decode / localStorage saklama mantığı yok — Supabase SDK halleder.
+
+import { supabase } from './supabaseClient'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
-const TOKEN_KEY = 'camikasifi.jwt'
 
-export type Role = 'ROLE_ADMIN' | 'ROLE_IMAM' | 'ROLE_CEMAAT'
 export type WebUserType = 'ADMIN' | 'IMAM' | 'CEMAAT'
 
 export interface UserProfile {
@@ -19,21 +22,14 @@ export interface UserProfile {
   phoneVisible?: boolean | null
 }
 
+/// `PUT /api/users/me` body. Şifre değişimi backend'de değil Supabase'de
+/// yapılır (supabase.auth.updateUser({password})), bu yüzden bu DTO'da yok.
 export interface UserUpdateInput {
   name: string
   surname: string
   birthday?: string | null
-  oldPassword: string
-  newPassword?: string | null
   phoneNumber?: string | null
   phoneVisible?: boolean | null
-}
-
-export interface AuthResponse {
-  accessToken: string
-  tokenType: string
-  expiresInSeconds: number
-  user: UserProfile
 }
 
 export interface Mosque {
@@ -274,6 +270,12 @@ export interface AdminUser {
   mosqueIds: number[]
 }
 
+/// `POST /api/admin/users` cevabı. Backend Supabase'de kayıt açıp şifre belirleme
+/// e-postası tetikler; `emailSent=false` ise admin manuel uyarmalıdır.
+export interface AdminUserCreateResponse extends AdminUser {
+  emailSent: boolean
+}
+
 export interface CompetitionRole {
   id: number
   userId: number
@@ -295,30 +297,11 @@ export class ApiError extends Error {
   }
 }
 
-export function getToken(): string | null {
+async function getAccessToken(): Promise<string | null> {
   if (typeof window === 'undefined') return null
-  return window.localStorage.getItem(TOKEN_KEY)
-}
-
-export function setToken(token: string | null): void {
-  if (typeof window === 'undefined') return
-  if (token) window.localStorage.setItem(TOKEN_KEY, token)
-  else window.localStorage.removeItem(TOKEN_KEY)
-}
-
-export interface JwtPayload {
-  sub: string
-  uid: number
-  exp: number
-  iat: number
-  roles: Role[]
-}
-
-export function decodeJwt(token: string): JwtPayload | null {
   try {
-    const [, payload] = token.split('.')
-    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
-    return JSON.parse(decodeURIComponent(escape(json))) as JwtPayload
+    const { data } = await supabase().auth.getSession()
+    return data.session?.access_token ?? null
   } catch {
     return null
   }
@@ -333,7 +316,7 @@ async function request<T>(
     Accept: 'application/json',
   }
   if (body !== undefined) headers['Content-Type'] = 'application/json; charset=utf-8'
-  const token = getToken()
+  const token = await getAccessToken()
   if (token) headers.Authorization = `Bearer ${token}`
 
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -358,17 +341,7 @@ async function request<T>(
 
 export const api = {
   auth: {
-    login: (email: string, password: string) =>
-      request<AuthResponse>('POST', '/api/auth/login', { email, password }),
-    register: (input: {
-      email: string
-      password: string
-      name: string
-      surname: string
-      birthday?: string
-      referralCode?: string
-      type?: WebUserType
-    }) => request<AuthResponse>('POST', '/api/auth/register', input),
+    // login/register Supabase tarafına taşındı. Buradan yalnız `me` çağrısı kaldı.
     me: () => request<UserProfile>('GET', '/api/users/me'),
   },
   users: {
@@ -441,6 +414,14 @@ export const api = {
       const q = type ? `?type=${type}` : ''
       return request<AdminUser[]>('GET', `/api/admin/users${q}`)
     },
+    create: (input: {
+      email: string
+      name: string
+      surname: string
+      type: WebUserType
+    }) => request<AdminUserCreateResponse>('POST', '/api/admin/users', input),
+    updateType: (userId: number, type: WebUserType) =>
+      request<AdminUser>('PUT', `/api/admin/users/${userId}/type`, { type }),
     updateMosques: (userId: number, mosqueIds: number[]) =>
       request<AdminUser>(
         'PUT',

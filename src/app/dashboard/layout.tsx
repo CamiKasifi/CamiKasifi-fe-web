@@ -12,8 +12,8 @@ export default function DashboardLayout({
   children: ReactNode
 }) {
   const router = useRouter()
-  const { user, roles, loading } = useAuth()
-  const allowed = isAdmin(roles) || isImam(roles)
+  const { user, loading } = useAuth()
+  const allowed = isAdmin(user) || isImam(user)
 
   useEffect(() => {
     if (loading) return

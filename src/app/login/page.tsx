@@ -2,15 +2,18 @@
 
 import { useState, useEffect, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, MailCheck } from 'lucide-react'
 import {
   Button,
+  ErrorBanner,
   Input,
   Label,
+  Modal,
 } from '@/components/ui'
 import { MosqueLogo } from '@/components/MosqueLogo'
-import { useAuth } from '@/lib/auth'
+import { useAuth, WebPanelForbiddenError } from '@/lib/auth'
 import { ApiError } from '@/lib/api'
+import { supabase } from '@/lib/supabaseClient'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -21,6 +24,47 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // "Şifremi unuttum" modal state.
+  const [forgotOpen, setForgotOpen] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotSubmitting, setForgotSubmitting] = useState(false)
+  const [forgotError, setForgotError] = useState<string | null>(null)
+  const [forgotSent, setForgotSent] = useState(false)
+
+  const openForgot = () => {
+    setForgotEmail(email.trim())
+    setForgotError(null)
+    setForgotSent(false)
+    setForgotOpen(true)
+  }
+
+  const submitForgot = async () => {
+    setForgotError(null)
+    const addr = forgotEmail.trim()
+    if (!addr) {
+      setForgotError('E-posta adresi gerekli.')
+      return
+    }
+    setForgotSubmitting(true)
+    try {
+      // Supabase güvenlik gereği "hesap yok" durumunda da 200 dönebilir; bu
+      // davranışı koruyup kullanıcıya her durumda aynı mesajı veriyoruz.
+      const redirectTo = `${window.location.origin}/auth/reset`
+      const { error: resetError } = await supabase().auth.resetPasswordForEmail(addr, {
+        redirectTo,
+      })
+      if (resetError) {
+        setForgotError(resetError.message)
+        return
+      }
+      setForgotSent(true)
+    } catch (err) {
+      setForgotError(err instanceof Error ? err.message : 'Talep gönderilemedi.')
+    } finally {
+      setForgotSubmitting(false)
+    }
+  }
 
   useEffect(() => {
     if (!loading && user) router.replace('/dashboard')
@@ -34,12 +78,17 @@ export default function LoginPage() {
       await login(email.trim(), password)
       router.replace('/dashboard')
     } catch (err) {
-      const msg =
-        err instanceof ApiError
-          ? err.status === 401 || err.status === 403
+      let msg: string
+      if (err instanceof WebPanelForbiddenError) {
+        msg = err.message
+      } else if (err instanceof ApiError) {
+        msg =
+          err.status === 401 || err.status === 403
             ? 'E-posta veya şifre hatalı.'
             : err.message
-          : 'Bağlantı kurulamadı. Lütfen tekrar deneyin.'
+      } else {
+        msg = 'Bağlantı kurulamadı. Lütfen tekrar deneyin.'
+      }
       setError(msg)
     } finally {
       setSubmitting(false)
@@ -113,7 +162,16 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="password">Şifre</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Şifre</Label>
+                <button
+                  type="button"
+                  onClick={openForgot}
+                  className="text-xs font-medium text-accent hover:underline"
+                >
+                  Şifremi unuttum
+                </button>
+              </div>
               <div className="relative">
                 <Input
                   id="password"
@@ -162,6 +220,60 @@ export default function LoginPage() {
       <footer className="relative z-20 mt-8 text-center text-[11px] text-muted-foreground">
         <p>“İnnemel-mü’minûne ihve.” — Mü’minler ancak kardeştir.</p>
       </footer>
+
+      <Modal
+        open={forgotOpen}
+        onClose={() => setForgotOpen(false)}
+        title={forgotSent ? 'E-posta gönderildi' : 'Şifremi unuttum'}
+        description={
+          forgotSent
+            ? 'Hesabın varsa şifre belirleme linki gelen kutuna düşecek. Spam klasörünü kontrol etmeyi unutma.'
+            : 'E-posta adresini gir; sana şifre belirleme bağlantısı göndereceğiz.'
+        }
+        footer={
+          forgotSent ? (
+            <Button onClick={() => setForgotOpen(false)}>Tamam</Button>
+          ) : (
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => setForgotOpen(false)}
+                disabled={forgotSubmitting}
+              >
+                Vazgeç
+              </Button>
+              <Button onClick={submitForgot} loading={forgotSubmitting}>
+                Gönder
+              </Button>
+            </>
+          )
+        }
+      >
+        {forgotSent ? (
+          <div className="flex items-center gap-3 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+            <MailCheck className="h-4 w-4" />
+            <span>
+              {forgotEmail} adresine bağlantı gönderildi.
+            </span>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <ErrorBanner message={forgotError} />
+            <div className="space-y-1.5">
+              <Label htmlFor="forgot-email">E-posta</Label>
+              <Input
+                id="forgot-email"
+                type="email"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                placeholder="ornek@camikasifi.com"
+                autoComplete="email"
+                required
+              />
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

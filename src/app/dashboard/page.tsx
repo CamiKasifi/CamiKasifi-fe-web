@@ -35,9 +35,9 @@ interface OverviewData {
 }
 
 export default function DashboardOverviewPage() {
-  const { user, roles } = useAuth()
-  const admin = isAdmin(roles)
-  const imam = isImam(roles)
+  const { user } = useAuth()
+  const admin = isAdmin(user)
+  const imam = isImam(user)
 
   const [data, setData] = useState<OverviewData | null>(null)
   const [loading, setLoading] = useState(true)

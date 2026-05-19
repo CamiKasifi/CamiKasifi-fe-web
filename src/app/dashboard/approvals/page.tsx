@@ -51,8 +51,8 @@ function statusVariant(
 
 export default function ApprovalsPage() {
   const router = useRouter()
-  const { roles, loading: authLoading } = useAuth()
-  const imam = isImam(roles)
+  const { user, loading: authLoading } = useAuth()
+  const imam = isImam(user)
 
   const [items, setItems] = useState<ApprovalItem[]>([])
   const [loading, setLoading] = useState(true)

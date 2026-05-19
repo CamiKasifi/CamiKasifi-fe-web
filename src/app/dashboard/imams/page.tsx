@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Building2, Search } from 'lucide-react'
+import { Building2, MailCheck, Search, UserPlus } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -22,20 +22,38 @@ import {
 import { isAdmin, useAuth } from '@/lib/auth'
 import {
   api,
-  ApiError,
   type AdminUser,
+  type AdminUserCreateResponse,
   type Mosque,
+  type WebUserType,
 } from '@/lib/api'
+import { formatApiError, useFetchData } from '@/lib/hooks'
 
 export default function ImamsPage() {
   const router = useRouter()
-  const { roles, loading: authLoading } = useAuth()
-  const admin = isAdmin(roles)
+  const { user, loading: authLoading } = useAuth()
+  const admin = isAdmin(user)
 
-  const [users, setUsers] = useState<AdminUser[]>([])
-  const [mosques, setMosques] = useState<Mosque[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // İki bağımsız fetch — paralel başlar; tek bir composite hata bayrağı yeter.
+  const usersFetch = useFetchData(() => api.adminUsers.list('IMAM'), [], {
+    enabled: admin,
+    initialData: [] as AdminUser[],
+  })
+  const mosquesFetch = useFetchData(() => api.mosques.list(), [], {
+    enabled: admin,
+    initialData: [] as Mosque[],
+  })
+  const users = usersFetch.data ?? []
+  const mosques = mosquesFetch.data ?? []
+  const loading = usersFetch.loading || mosquesFetch.loading
+  const error = usersFetch.error ?? mosquesFetch.error
+  const refresh = useCallback(
+    () =>
+      Promise.all([usersFetch.refresh(), mosquesFetch.refresh()]).then(() => undefined),
+    [usersFetch.refresh, mosquesFetch.refresh],
+  )
+  const setUsers = (next: AdminUser[]) => usersFetch.setData(next)
+
   const [search, setSearch] = useState('')
 
   const [editTarget, setEditTarget] = useState<AdminUser | null>(null)
@@ -44,30 +62,31 @@ export default function ImamsPage() {
   const [editError, setEditError] = useState<string | null>(null)
   const [mosqueQuery, setMosqueQuery] = useState('')
 
+  // "Yeni kullanıcı ekle" modal state — admin yeni IMAM veya ADMIN açabilir.
+  // Backend Supabase'de hesabı açıp şifre belirleme e-postası tetikler;
+  // emailSent durumuna göre success ekranı renklenir.
+  type CreateForm = {
+    email: string
+    name: string
+    surname: string
+    type: WebUserType
+  }
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createForm, setCreateForm] = useState<CreateForm>({
+    email: '',
+    name: '',
+    surname: '',
+    type: 'IMAM',
+  })
+  const [createSubmitting, setCreateSubmitting] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [createResult, setCreateResult] = useState<AdminUserCreateResponse | null>(
+    null,
+  )
+
   useEffect(() => {
     if (!authLoading && !admin) router.replace('/dashboard')
   }, [authLoading, admin, router])
-
-  const refresh = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const [u, m] = await Promise.all([
-        api.adminUsers.list('IMAM'),
-        api.mosques.list(),
-      ])
-      setUsers(u)
-      setMosques(m)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Veriler alınamadı.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (admin) void refresh()
-  }, [admin])
 
   const mosqueById = useMemo(() => {
     const map = new Map<number, Mosque>()
@@ -116,18 +135,50 @@ export default function ImamsPage() {
         editTarget.id,
         picked,
       )
-      setUsers((prev) =>
-        prev.map((u) => (u.id === updated.id ? updated : u)),
-      )
+      // Optimistic update — submit sıralı çalıştığı için stale closure riski yok.
+      setUsers(users.map((u) => (u.id === updated.id ? updated : u)))
       setEditTarget(null)
     } catch (err) {
-      setEditError(
-        err instanceof ApiError ? err.message : 'Atama güncellenemedi.',
-      )
+      setEditError(formatApiError(err, 'Atama güncellenemedi.'))
     } finally {
       setSubmitting(false)
     }
   }
+
+  const openCreate = () => {
+    setCreateForm({ email: '', name: '', surname: '', type: 'IMAM' })
+    setCreateError(null)
+    setCreateResult(null)
+    setCreateOpen(true)
+  }
+
+  const closeCreate = () => {
+    // Başarılı yaratıldıysa refresh çalıştır — yeni IMAM listede görünsün.
+    setCreateOpen(false)
+    if (createResult) {
+      void refresh()
+    }
+    setCreateResult(null)
+  }
+
+  const submitCreate = async () => {
+    setCreateSubmitting(true)
+    setCreateError(null)
+    try {
+      const res = await api.adminUsers.create({
+        email: createForm.email.trim(),
+        name: createForm.name.trim(),
+        surname: createForm.surname.trim(),
+        type: createForm.type,
+      })
+      setCreateResult(res)
+    } catch (err) {
+      setCreateError(formatApiError(err, 'Kullanıcı oluşturulamadı.'))
+    } finally {
+      setCreateSubmitting(false)
+    }
+  }
+
 
   if (!admin) return null
 
@@ -151,6 +202,11 @@ export default function ImamsPage() {
           />
         </div>
         <Badge variant="default">{filtered.length}</Badge>
+        <div className="ml-auto">
+          <Button onClick={openCreate}>
+            <UserPlus className="h-4 w-4" /> Yeni kullanıcı
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -331,6 +387,139 @@ export default function ImamsPage() {
             </div>
           )}
         </div>
+      </Modal>
+
+      <Modal
+        open={createOpen}
+        onClose={closeCreate}
+        title={createResult ? 'Kullanıcı oluşturuldu' : 'Yeni kullanıcı ekle'}
+        description={
+          createResult
+            ? createResult.emailSent
+              ? 'Kullanıcıya şifre belirleme e-postası gönderildi. Linke tıklayıp kendi şifresini kurabilir.'
+              : 'Hesap oluşturuldu fakat e-posta gönderilemedi. Kullanıcıyı manuel olarak "Şifremi unuttum" akışına yönlendir.'
+            : 'Yeni İMAM veya YÖNETİCİ hesabı oluştur. Şifre kurma maili kullanıcıya gönderilecek.'
+        }
+        footer={
+          createResult ? (
+            <Button onClick={closeCreate}>Tamam</Button>
+          ) : (
+            <>
+              <Button
+                variant="secondary"
+                onClick={closeCreate}
+                disabled={createSubmitting}
+              >
+                Vazgeç
+              </Button>
+              <Button onClick={submitCreate} loading={createSubmitting}>
+                Oluştur
+              </Button>
+            </>
+          )
+        }
+      >
+        {createResult ? (
+          <div className="space-y-3">
+            <div
+              className={`rounded-md border px-3 py-2 text-sm ${
+                createResult.emailSent
+                  ? 'border-success/30 bg-success/10'
+                  : 'border-destructive/30 bg-destructive/10'
+              }`}
+            >
+              <div
+                className={`flex items-center gap-2 font-medium ${
+                  createResult.emailSent ? 'text-success' : 'text-destructive'
+                }`}
+              >
+                <MailCheck className="h-4 w-4" />
+                {createResult.type === 'ADMIN' ? 'Yönetici' : 'İmam'} hesabı hazır
+              </div>
+              <div className="mt-1 text-muted-foreground">
+                {createResult.email}
+              </div>
+              {!createResult.emailSent && (
+                <p className="mt-2 text-xs text-destructive">
+                  Şifre belirleme e-postası gönderilemedi. Kullanıcıya giriş
+                  ekranındaki "Şifremi unuttum" akışını kullanmasını söyle.
+                </p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <ErrorBanner message={createError} />
+
+            <div className="space-y-1.5">
+              <Label htmlFor="create-email">E-posta</Label>
+              <Input
+                id="create-email"
+                type="email"
+                value={createForm.email}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, email: e.target.value })
+                }
+                placeholder="ornek@camikasifi.com"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="create-name">Ad</Label>
+                <Input
+                  id="create-name"
+                  value={createForm.name}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, name: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="create-surname">Soyad</Label>
+                <Input
+                  id="create-surname"
+                  value={createForm.surname}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, surname: e.target.value })
+                  }
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+                Rol
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                {(['IMAM', 'ADMIN'] as const).map((t) => {
+                  const active = createForm.type === t
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setCreateForm({ ...createForm, type: t })}
+                      className={`rounded-md border px-3 py-2 text-sm font-medium transition ${
+                        active
+                          ? 'border-accent bg-accent/10 text-accent'
+                          : 'border-border bg-muted/20 text-foreground hover:bg-muted/40'
+                      }`}
+                    >
+                      {t === 'IMAM' ? 'İmam' : 'Yönetici'}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Yöneticiler tüm panel yetkilerine sahiptir. İmamlar yalnızca
+                kendi atandıkları camiyle ilgilenebilir.
+              </p>
+            </div>
+          </div>
+        )}
       </Modal>
     </>
   )

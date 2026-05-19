@@ -47,7 +47,10 @@ export default function RootLayout({
       lang="tr"
       className={`${jakarta.variable} ${amiri.variable} ${firaCode.variable}`}
     >
-      <body>
+      {/* suppressHydrationWarning: ColorZilla / Grammarly gibi tarayıcı uzantıları
+          body'ye `cz-shortcut-listen` benzeri attribute enjekte ederek hydration
+          mismatch'e yol açıyor. Sadece body düzeyinde bastırıyoruz. */}
+      <body suppressHydrationWarning>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

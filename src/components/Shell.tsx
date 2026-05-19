@@ -50,13 +50,13 @@ function isActive(pathname: string, href: string) {
 
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
-  const { user, roles, logout } = useAuth()
+  const { user, logout } = useAuth()
   const [drawerOpen, setDrawerOpen] = useState(false)
 
-  const nav = isAdmin(roles) ? ADMIN_NAV : isImam(roles) ? IMAM_NAV : []
-  const roleLabel = isAdmin(roles)
+  const nav = isAdmin(user) ? ADMIN_NAV : isImam(user) ? IMAM_NAV : []
+  const roleLabel = isAdmin(user)
     ? 'Yönetici'
-    : isImam(roles)
+    : isImam(user)
       ? 'İmam'
       : 'Kullanıcı'
 

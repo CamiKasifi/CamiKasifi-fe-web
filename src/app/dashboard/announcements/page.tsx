@@ -67,8 +67,8 @@ function formatDateTime(iso: string | null) {
 }
 
 export default function AnnouncementsPage() {
-  const { roles } = useAuth()
-  const imam = isImam(roles)
+  const { user } = useAuth()
+  const imam = isImam(user)
 
   const [mosques, setMosques] = useState<Mosque[]>([])
   const [selectedMosqueId, setSelectedMosqueId] = useState<number | null>(null)

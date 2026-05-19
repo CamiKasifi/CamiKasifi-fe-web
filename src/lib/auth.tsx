@@ -6,92 +6,116 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
-import {
-  api,
-  decodeJwt,
-  getToken,
-  setToken,
-  type Role,
-  type UserProfile,
-} from './api'
+import { api, ApiError, type UserProfile, type WebUserType } from './api'
+import { supabase } from './supabaseClient'
 
 interface AuthState {
   user: UserProfile | null
-  roles: Role[]
   loading: boolean
+  /**
+   * E-mail/şifre ile Supabase'e giriş yapar, profilini backend'den çeker ve
+   * CEMAAT ise oturumu kapatıp `WebPanelForbiddenError` fırlatır.
+   */
   login: (email: string, password: string) => Promise<UserProfile>
-  logout: () => void
+  logout: () => Promise<void>
   refresh: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
 
+/// CEMAAT kullanıcısı web paneline giriş yapmaya çalışırsa fırlatılır.
+/// Login ekranı bunu yakalayıp anlaşılır mesaj gösterir.
+export class WebPanelForbiddenError extends Error {
+  constructor() {
+    super('Bu panel yalnız İMAM ve YÖNETİCİ rolleri içindir.')
+    this.name = 'WebPanelForbiddenError'
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null)
-  const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState<boolean>(true)
+  // İlk hydrate ile auth-state-stream race koşmasın diye küçük bir bayrak.
+  const initialHydrateDone = useRef(false)
 
-  const hydrateFromToken = useCallback(async () => {
-    const token = getToken()
-    if (!token) {
+  const refresh = useCallback(async () => {
+    const session = (await supabase().auth.getSession()).data.session
+    if (!session) {
       setUser(null)
-      setRoles([])
       setLoading(false)
       return
     }
-    const payload = decodeJwt(token)
-    if (!payload || payload.exp * 1000 < Date.now()) {
-      setToken(null)
-      setUser(null)
-      setRoles([])
-      setLoading(false)
-      return
-    }
-    setRoles(payload.roles ?? [])
     try {
       const me = await api.auth.me()
+      // CEMAAT panel'e giremez — sessizce sign-out ediyoruz.
+      if (me.type === 'CEMAAT') {
+        await supabase().auth.signOut()
+        setUser(null)
+        return
+      }
       setUser(me)
-    } catch {
-      setToken(null)
+    } catch (err) {
+      // /api/users/me 401 → token geçersiz ya da WebUser provisioning eksik.
+      // Sign-out + login'e fallback.
+      if (err instanceof ApiError && (err.status === 401 || err.status === 404)) {
+        await supabase().auth.signOut()
+      }
       setUser(null)
-      setRoles([])
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    void hydrateFromToken()
-  }, [hydrateFromToken])
+    void refresh().then(() => {
+      initialHydrateDone.current = true
+    })
+
+    const { data: sub } = supabase().auth.onAuthStateChange((event) => {
+      if (!initialHydrateDone.current) return
+      if (event === 'SIGNED_OUT') {
+        setUser(null)
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        void refresh()
+      }
+    })
+
+    return () => {
+      sub.subscription.unsubscribe()
+    }
+  }, [refresh])
 
   const login = useCallback(async (email: string, password: string) => {
-    const res = await api.auth.login(email, password)
-    setToken(res.accessToken)
-    const payload = decodeJwt(res.accessToken)
-    setRoles(payload?.roles ?? [])
-    setUser(res.user)
-    return res.user
+    setLoading(true)
+    try {
+      const { error } = await supabase().auth.signInWithPassword({ email, password })
+      if (error) {
+        throw new ApiError(error.status ?? 401, error.message)
+      }
+      const me = await api.auth.me()
+      if (me.type === 'CEMAAT') {
+        await supabase().auth.signOut()
+        throw new WebPanelForbiddenError()
+      }
+      setUser(me)
+      return me
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  const logout = useCallback(() => {
-    setToken(null)
+  const logout = useCallback(async () => {
+    await supabase().auth.signOut()
     setUser(null)
-    setRoles([])
   }, [])
 
   const value = useMemo<AuthState>(
-    () => ({
-      user,
-      roles,
-      loading,
-      login,
-      logout,
-      refresh: hydrateFromToken,
-    }),
-    [user, roles, loading, login, logout, hydrateFromToken],
+    () => ({ user, loading, login, logout, refresh }),
+    [user, loading, login, logout, refresh],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
@@ -103,10 +127,12 @@ export function useAuth(): AuthState {
   return ctx
 }
 
-export function isAdmin(roles: Role[]): boolean {
-  return roles.includes('ROLE_ADMIN')
+export function isAdmin(user: UserProfile | null | undefined): boolean {
+  return user?.type === 'ADMIN'
 }
 
-export function isImam(roles: Role[]): boolean {
-  return roles.includes('ROLE_IMAM')
+export function isImam(user: UserProfile | null | undefined): boolean {
+  return user?.type === 'IMAM'
 }
+
+export type { WebUserType }
