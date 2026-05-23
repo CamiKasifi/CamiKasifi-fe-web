@@ -34,6 +34,7 @@ import {
   type IncentiveRuleType,
   type SalahType,
 } from '@/lib/api'
+import { DateTimePicker } from '@/components/DateTimePicker'
 
 type Filter = 'ALL' | 'ACTIVE' | 'INACTIVE'
 
@@ -542,22 +543,18 @@ export function IncentivesPanel({
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="inc-start">Başlangıç (ops.)</Label>
-                <Input
+                <DateTimePicker
                   id="inc-start"
-                  type="datetime-local"
                   value={form.startsAt}
-                  onChange={(e) =>
-                    setForm({ ...form, startsAt: e.target.value })
-                  }
+                  onChange={(v) => setForm({ ...form, startsAt: v })}
                 />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="inc-end">Bitiş (ops.)</Label>
-                <Input
+                <DateTimePicker
                   id="inc-end"
-                  type="datetime-local"
                   value={form.endsAt}
-                  onChange={(e) => setForm({ ...form, endsAt: e.target.value })}
+                  onChange={(v) => setForm({ ...form, endsAt: v })}
                 />
               </div>
             </div>

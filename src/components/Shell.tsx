@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
+  Award,
   BarChart3,
   Building2,
   ClipboardCheck,
@@ -32,6 +33,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: 'Camiler', shortLabel: 'Camiler', href: '/dashboard/mosques', icon: Building2 },
   { label: 'İmamlar', shortLabel: 'İmamlar', href: '/dashboard/imams', icon: UserCog },
   { label: 'Yarışmalar', shortLabel: 'Yarışma', href: '/dashboard/competitions', icon: Trophy },
+  { label: 'Rozetler', shortLabel: 'Rozet', href: '/dashboard/badges', icon: Award },
 ]
 
 const IMAM_NAV: NavItem[] = [

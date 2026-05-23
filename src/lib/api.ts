@@ -287,6 +287,90 @@ export interface CompetitionRole {
   mosqueIds: number[]
 }
 
+/* ───── Rozet kataloğu (admin) ───── */
+
+export type BadgeCategory =
+  | 'PRAYER_STREAK'
+  | 'TOTAL_PRAYERS'
+  | 'FULL_DAY'
+  | 'FRIDAY_STREAK'
+  | 'MOSQUE_LOYALTY'
+  | 'POINTS'
+  | 'COMPETITION_WIN'
+
+export const BADGE_CATEGORIES: BadgeCategory[] = [
+  'PRAYER_STREAK',
+  'TOTAL_PRAYERS',
+  'FULL_DAY',
+  'FRIDAY_STREAK',
+  'MOSQUE_LOYALTY',
+  'POINTS',
+  'COMPETITION_WIN',
+]
+
+export const BADGE_CATEGORY_LABELS: Record<BadgeCategory, string> = {
+  PRAYER_STREAK: 'Vakit Ustası',
+  TOTAL_PRAYERS: 'Toplam Namaz',
+  FULL_DAY: 'Tam Gün',
+  FRIDAY_STREAK: 'Cuma Sadakati',
+  MOSQUE_LOYALTY: 'Cami Sadakati',
+  POINTS: 'Puan',
+  COMPETITION_WIN: 'Yarışma Şampiyonu',
+}
+
+export type BadgeTier = 'CIRAK' | 'KALFA' | 'USTA' | 'USTAD'
+
+export const BADGE_TIERS: BadgeTier[] = ['CIRAK', 'KALFA', 'USTA', 'USTAD']
+
+export const BADGE_TIER_LABELS: Record<BadgeTier, string> = {
+  CIRAK: 'Çırak',
+  KALFA: 'Kalfa',
+  USTA: 'Usta',
+  USTAD: 'Üstad',
+}
+
+export const BADGE_ICON_KEYS = [
+  'prayer_fajr',
+  'prayer_dhuhr',
+  'prayer_asr',
+  'prayer_maghrib',
+  'prayer_isha',
+  'total_prayers',
+  'full_day',
+  'friday',
+  'mosque',
+  'points',
+  'trophy',
+] as const
+
+/// Admin rozet katalogu satırı — backend `AdminBadgeResponse` karşılığı.
+/// `earnedByCount` silme kararı için ipucu: > 0 ise silme 409 alır.
+export interface AdminBadge {
+  id: number
+  code: string
+  name: string
+  description: string
+  category: BadgeCategory | string
+  tier: BadgeTier | string
+  targetValue: number
+  iconKey: string
+  salahType: SalahType | null
+  sortOrder: number
+  earnedByCount: number
+}
+
+export interface BadgeInput {
+  code: string
+  name: string
+  description: string
+  category: BadgeCategory
+  tier: BadgeTier
+  targetValue: number
+  iconKey: string
+  salahType?: SalahType | null
+  sortOrder?: number | null
+}
+
 export class ApiError extends Error {
   status: number
   fieldErrors?: Array<{ field: string; message: string }>
@@ -428,6 +512,15 @@ export const api = {
         `/api/admin/users/${userId}/mosques`,
         { mosqueIds },
       ),
+  },
+  adminBadges: {
+    list: () => request<AdminBadge[]>('GET', '/api/admin/badges'),
+    create: (input: BadgeInput) =>
+      request<AdminBadge>('POST', '/api/admin/badges', input),
+    update: (id: number, input: BadgeInput) =>
+      request<AdminBadge>('PUT', `/api/admin/badges/${id}`, input),
+    remove: (id: number) =>
+      request<void>('DELETE', `/api/admin/badges/${id}`),
   },
   competitions: {
     list: () => request<Competition[]>('GET', '/api/competitions'),

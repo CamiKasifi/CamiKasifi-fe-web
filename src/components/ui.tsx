@@ -369,7 +369,7 @@ export function Modal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto py-6 px-4"
     >
       <button
         type="button"
@@ -377,8 +377,8 @@ export function Modal({
         onClick={onClose}
         className="absolute inset-0 bg-foreground/30 backdrop-blur-sm"
       />
-      <div className="relative z-10 w-full max-w-md rounded-lg border border-border bg-surface shadow-pop">
-        <div className="border-b border-border px-5 py-4">
+      <div className="relative z-10 my-auto flex max-h-[calc(100vh-3rem)] w-full max-w-md flex-col rounded-lg border border-border bg-surface shadow-pop">
+        <div className="shrink-0 border-b border-border px-5 py-4">
           <h3 id="modal-title" className="text-base font-semibold text-foreground">
             {title}
           </h3>
@@ -386,9 +386,9 @@ export function Modal({
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           )}
         </div>
-        <div className="px-5 py-5">{children}</div>
+        <div className="flex-1 overflow-y-auto px-5 py-5">{children}</div>
         {footer && (
-          <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
+          <div className="shrink-0 flex items-center justify-end gap-2 border-t border-border px-5 py-3">
             {footer}
           </div>
         )}
