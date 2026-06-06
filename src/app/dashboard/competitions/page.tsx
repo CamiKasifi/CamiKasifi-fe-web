@@ -1,7 +1,14 @@
 'use client'
 
 import { useEffect, useState, type FormEvent } from 'react'
-import { BarChart3, Gift, Plus, ShieldCheck, Trophy } from 'lucide-react'
+import {
+  BarChart3,
+  CalendarPlus,
+  Gift,
+  Plus,
+  ShieldCheck,
+  Trophy,
+} from 'lucide-react'
 import {
   Badge,
   Button,
@@ -24,10 +31,11 @@ import { api, type Competition, type Mosque } from '@/lib/api'
 import { formatApiError } from '@/lib/hooks'
 import { IncentivesTab } from '@/components/competitions/IncentivesTab'
 import { LeaderboardTab } from '@/components/competitions/LeaderboardTab'
+import { ManualAttendanceTab } from '@/components/competitions/ManualAttendanceTab'
 import { RolesTab } from '@/components/competitions/RolesTab'
 import { TabButton } from '@/components/competitions/TabButton'
 
-type Tab = 'leaderboard' | 'roles' | 'incentives'
+type Tab = 'leaderboard' | 'roles' | 'incentives' | 'manual'
 
 /// Yarışma yönetim sayfası — orkestratör.
 ///
@@ -229,6 +237,15 @@ export default function CompetitionsPage() {
                   >
                     Teşvikler
                   </TabButton>
+                  {canCreate && (
+                    <TabButton
+                      active={tab === 'manual'}
+                      onClick={() => setTab('manual')}
+                      icon={CalendarPlus}
+                    >
+                      İbadet Ekle
+                    </TabButton>
+                  )}
                 </div>
               )}
             </CardHeader>
@@ -247,6 +264,8 @@ export default function CompetitionsPage() {
                   currentUserId={user?.id ?? null}
                   mosques={mosques}
                 />
+              ) : tab === 'manual' ? (
+                <ManualAttendanceTab competitionId={selectedCompetition.id} />
               ) : (
                 <IncentivesTab
                   competitionId={selectedCompetition.id}

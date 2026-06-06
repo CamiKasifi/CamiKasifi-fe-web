@@ -76,6 +76,14 @@ export type SalahType =
   | 'ISHA'
 export type ApprovalKind = 'CENTRAL' | 'GUEST'
 
+/// İmamın manuel ibadet ekleme sonucu (POST /api/competitions/{id}/manual-attendance).
+export interface ManualAttendanceResult {
+  added: number
+  skipped: number
+  pointsAdded: number
+  skippedDetails: string[]
+}
+
 export interface ApprovalItem {
   id: number
   competitionId: number | null
@@ -320,6 +328,16 @@ export interface ImamMosqueApplicationInput {
   roleTitle?: string | null
 }
 
+/** İmam self-kayıt gövdesi. Kimlik (sub/email) Supabase JWT'sinden alınır. */
+export interface ImamRegistrationInput {
+  name: string
+  surname: string
+  phone?: string | null
+  mosqueId: number
+  note?: string | null
+  roleTitle?: string | null
+}
+
 /* ───── Rozet kataloğu (admin) ───── */
 
 export type BadgeCategory =
@@ -524,6 +542,11 @@ export const api = {
         `/api/imams/me/mosques/${mosqueId}/analytics`,
       ),
   },
+  imamRegistrations: {
+    /** İmam self-kayıt: profil + PENDING başvuru oluşturur (provisioning yolu). */
+    create: (input: ImamRegistrationInput) =>
+      request<ImamMosqueApplication>('POST', '/api/imam-registrations', input),
+  },
   imamMosqueApplications: {
     /** İmamın kendi başvuruları (durumlarıyla). */
     listMine: () =>
@@ -603,6 +626,18 @@ export const api = {
       request<Competition>('POST', '/api/competitions', input),
     leaderboard: (id: number) =>
       request<LeaderboardEntry[]>('GET', `/api/competitions/${id}/leaderboard`),
+    manualAttendance: (
+      competitionId: number,
+      input: {
+        personId: number
+        entries: { salahDate: string; salahType: SalahType }[]
+      },
+    ) =>
+      request<ManualAttendanceResult>(
+        'POST',
+        `/api/competitions/${competitionId}/manual-attendance`,
+        input,
+      ),
   },
   approvals: {
     list: (competitionId?: number) => {

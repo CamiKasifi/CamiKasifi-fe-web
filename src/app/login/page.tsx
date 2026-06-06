@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, type FormEvent } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, MailCheck } from 'lucide-react'
 import {
@@ -209,8 +210,18 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          Yalnızca{' '}
+        <p className="mt-4 text-center text-sm text-muted-foreground">
+          İmam mısın?{' '}
+          <Link
+            href="/register"
+            className="font-medium text-accent hover:underline"
+          >
+            Cami başvurusu yap
+          </Link>
+        </p>
+
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          Panel yalnızca{' '}
           <strong className="font-semibold text-foreground/80">YÖNETİCİ</strong>{' '}
           ve <strong className="font-semibold text-foreground/80">İMAM</strong>{' '}
           rollerine açıktır.
