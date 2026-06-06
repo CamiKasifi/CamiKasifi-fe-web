@@ -25,6 +25,7 @@ import {
   type ImamMosqueApplication,
   type Mosque,
   type MosqueInput,
+  type Province,
 } from '@/lib/api'
 import { formatApiError } from '@/lib/hooks'
 import { ImamMosqueApplyModal } from '@/components/mosques/ImamMosqueApplyModal'
@@ -96,6 +97,10 @@ export default function MosquesPage() {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
+  // Admin cami formu için il/ilçe dropdown
+  const [provinces, setProvinces] = useState<Province[]>([])
+  const [formDistricts, setFormDistricts] = useState<string[]>([])
+
   // İmam için cami başvuru modalı
   const [applyOpen, setApplyOpen] = useState(false)
 
@@ -131,6 +136,10 @@ export default function MosquesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [admin])
 
+  useEffect(() => {
+    if (admin) api.provinces.list().then(setProvinces).catch(() => {})
+  }, [admin])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return mosques
@@ -146,6 +155,7 @@ export default function MosquesPage() {
   const openCreate = () => {
     setEditing(null)
     setForm(EMPTY)
+    setFormDistricts([])
     setFormError(null)
     setModalOpen(true)
   }
@@ -161,6 +171,8 @@ export default function MosquesPage() {
       latitude: m.latitude,
       longitude: m.longitude,
     })
+    const found = provinces.find((p) => p.il === m.city)
+    setFormDistricts(found ? found.ilceler : [])
     setFormError(null)
     setModalOpen(true)
   }
@@ -408,24 +420,46 @@ export default function MosquesPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="city">Şehir</Label>
-                <Input
+                <Label htmlFor="city">İl</Label>
+                <select
                   id="city"
                   required
                   value={form.city}
-                  onChange={(e) => setForm({ ...form, city: e.target.value })}
-                />
+                  onChange={(e) => {
+                    const city = e.target.value
+                    const found = provinces.find((p) => p.il === city)
+                    setFormDistricts(found ? found.ilceler : [])
+                    setForm({ ...form, city, district: '' })
+                  }}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="">— Seçiniz —</option>
+                  {provinces.map((p) => (
+                    <option key={p.il} value={p.il}>
+                      {p.il}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="district">İlçe</Label>
-                <Input
+                <select
                   id="district"
                   required
                   value={form.district}
+                  disabled={formDistricts.length === 0}
                   onChange={(e) =>
                     setForm({ ...form, district: e.target.value })
                   }
-                />
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">— Seçiniz —</option>
+                  {formDistricts.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
