@@ -1,0 +1,12 @@
+# Netlify — Next.js 15 (App Router).
+# Netlify, Next.js'i otomatik algılar ve @netlify/plugin-nextjs'i kendi kurar;
+# burada sadece build komutu + Node sürümünü sabitliyoruz (en sık build hatası
+# yanlış Node sürümünden olur). Env değişkenleri (NEXT_PUBLIC_*) Netlify UI'dan
+# girilir — bu dosyaya secret yazılmaz.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
