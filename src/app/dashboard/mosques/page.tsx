@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import dynamic from 'next/dynamic'
-import { FileEdit, Pencil, Plus, Search, Settings, Trash2 } from 'lucide-react'
+import { FileEdit, Pencil, Plus, Search, Send, Trash2 } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -20,9 +20,14 @@ import {
   TR,
 } from '@/components/ui'
 import { isAdmin, useAuth } from '@/lib/auth'
-import { api, type Mosque, type MosqueInput } from '@/lib/api'
+import {
+  api,
+  type ImamMosqueApplication,
+  type Mosque,
+  type MosqueInput,
+} from '@/lib/api'
 import { formatApiError } from '@/lib/hooks'
-import { ImamMosquePicker } from '@/components/mosques/ImamMosquePicker'
+import { ImamMosqueApplyModal } from '@/components/mosques/ImamMosqueApplyModal'
 import { ImamMosqueProfileEditor } from '@/components/mosques/ImamMosqueProfileEditor'
 
 /// Haritalı seçici client-side bir paket olduğu için SSR kapalı dynamic import.
@@ -46,6 +51,24 @@ const EMPTY: MosqueInput = {
   radius: 500,
   latitude: 0,
   longitude: 0,
+}
+
+const APPLICATION_STATUS_LABEL: Record<
+  ImamMosqueApplication['status'],
+  string
+> = {
+  PENDING: 'Bekliyor',
+  APPROVED: 'Onaylandı',
+  REJECTED: 'Reddedildi',
+}
+
+const APPLICATION_STATUS_VARIANT: Record<
+  ImamMosqueApplication['status'],
+  'warning' | 'success' | 'destructive'
+> = {
+  PENDING: 'warning',
+  APPROVED: 'success',
+  REJECTED: 'destructive',
 }
 
 /// Camiler yönetim sayfası — orkestratör.
@@ -73,20 +96,29 @@ export default function MosquesPage() {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
-  // İmam için kendi camilerini yönetme picker'ı
-  const [pickerOpen, setPickerOpen] = useState(false)
+  // İmam için cami başvuru modalı
+  const [applyOpen, setApplyOpen] = useState(false)
 
   // İmam'ın per-cami profil editörü (history, photo, radius)
   const [profileMosque, setProfileMosque] = useState<Mosque | null>(null)
+
+  // İmamın başvuruları (bekleyen/onaylanan/reddedilen).
+  const [applications, setApplications] = useState<ImamMosqueApplication[]>([])
 
   const refresh = async () => {
     setLoading(true)
     setError(null)
     try {
-      const list = admin
-        ? await api.mosques.list()
-        : await api.imamMosques.list()
-      setMosques(list)
+      if (admin) {
+        setMosques(await api.mosques.list())
+      } else {
+        const [list, apps] = await Promise.all([
+          api.imamMosques.list(),
+          api.imamMosqueApplications.listMine(),
+        ])
+        setMosques(list)
+        setApplications(apps)
+      }
     } catch (err) {
       setError(formatApiError(err, 'Camiler alınamadı.'))
     } finally {
@@ -177,8 +209,8 @@ export default function MosquesPage() {
               <Plus className="h-4 w-4" /> Yeni Cami
             </Button>
           ) : (
-            <Button variant="secondary" onClick={() => setPickerOpen(true)}>
-              <Settings className="h-4 w-4" /> Camilerimi yönet
+            <Button onClick={() => setApplyOpen(true)}>
+              <Send className="h-4 w-4" /> Cami başvurusu yap
             </Button>
           )
         }
@@ -275,12 +307,57 @@ export default function MosquesPage() {
         </Table>
       )}
 
+      {!admin && applications.length > 0 && (
+        <div className="mt-8">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Başvurularım
+          </h2>
+          <div className="space-y-2">
+            {applications.map((a) => (
+              <div
+                key={a.id}
+                className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-border bg-surface px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-foreground">
+                      {a.mosqueName}
+                    </span>
+                    <Badge variant={APPLICATION_STATUS_VARIANT[a.status]}>
+                      {APPLICATION_STATUS_LABEL[a.status]}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {[a.mosqueNeighbourhood, a.mosqueDistrict, a.mosqueCity]
+                      .filter(Boolean)
+                      .join(', ')}
+                  </p>
+                  {a.roleTitle && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Görev: {a.roleTitle}
+                    </p>
+                  )}
+                  {a.status === 'REJECTED' && a.decisionNote && (
+                    <p className="mt-1 text-xs text-destructive">
+                      Red gerekçesi: {a.decisionNote}
+                    </p>
+                  )}
+                </div>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {new Date(a.createdAt).toLocaleDateString('tr-TR')}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {!admin && (
-        <ImamMosquePicker
-          open={pickerOpen}
-          onClose={() => setPickerOpen(false)}
-          currentIds={mosques.map((m) => m.id)}
-          onSaved={refresh}
+        <ImamMosqueApplyModal
+          open={applyOpen}
+          onClose={() => setApplyOpen(false)}
+          defaultPhone={user?.phoneNumber ?? null}
+          onSubmitted={refresh}
         />
       )}
 

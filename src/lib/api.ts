@@ -287,6 +287,39 @@ export interface CompetitionRole {
   mosqueIds: number[]
 }
 
+/* ───── İmam cami başvurusu ───── */
+
+export type ApplicationStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+
+/** `ImamMosqueApplicationResponse` karşılığı — imam ve yönetici aynı şekli görür. */
+export interface ImamMosqueApplication {
+  id: number
+  applicantUserId: number
+  applicantName: string | null
+  applicantSurname: string | null
+  applicantEmail: string
+  mosqueId: number
+  mosqueName: string
+  mosqueCity: string
+  mosqueDistrict: string
+  mosqueNeighbourhood: string
+  note: string | null
+  contactPhone: string | null
+  roleTitle: string | null
+  status: ApplicationStatus
+  decisionNote: string | null
+  decidedByName: string | null
+  createdAt: string
+  decidedAt: string | null
+}
+
+export interface ImamMosqueApplicationInput {
+  mosqueId: number
+  note?: string | null
+  contactPhone?: string | null
+  roleTitle?: string | null
+}
+
 /* ───── Rozet kataloğu (admin) ───── */
 
 export type BadgeCategory =
@@ -467,8 +500,6 @@ export const api = {
   },
   imamMosques: {
     list: () => request<Mosque[]>('GET', '/api/imams/me/mosques'),
-    update: (mosqueIds: number[]) =>
-      request<Mosque[]>('PUT', '/api/imams/me/mosques', { mosqueIds }),
     updateProfile: (
       mosqueId: number,
       input: ImamMosqueProfileUpdateInput,
@@ -491,6 +522,50 @@ export const api = {
       request<MosqueAnalytics>(
         'GET',
         `/api/imams/me/mosques/${mosqueId}/analytics`,
+      ),
+  },
+  imamMosqueApplications: {
+    /** İmamın kendi başvuruları (durumlarıyla). */
+    listMine: () =>
+      request<ImamMosqueApplication[]>(
+        'GET',
+        '/api/imams/me/mosque-applications',
+      ),
+    apply: (input: ImamMosqueApplicationInput) =>
+      request<ImamMosqueApplication>(
+        'POST',
+        '/api/imams/me/mosque-applications',
+        input,
+      ),
+  },
+  adminImamApplications: {
+    list: (status?: ApplicationStatus) => {
+      const q = status ? `?status=${status}` : ''
+      return request<ImamMosqueApplication[]>(
+        'GET',
+        `/api/admin/imam-applications${q}`,
+      )
+    },
+    pendingCount: () =>
+      request<{ count: number }>(
+        'GET',
+        '/api/admin/imam-applications/pending-count',
+      ),
+    /** Onayla — `mosqueId` doluysa yönetici camiyi değiştirmiş olur. */
+    approve: (
+      id: number,
+      input?: { mosqueId?: number | null; decisionNote?: string | null },
+    ) =>
+      request<ImamMosqueApplication>(
+        'POST',
+        `/api/admin/imam-applications/${id}/approve`,
+        input ?? {},
+      ),
+    reject: (id: number, input?: { decisionNote?: string | null }) =>
+      request<ImamMosqueApplication>(
+        'POST',
+        `/api/admin/imam-applications/${id}/reject`,
+        input ?? {},
       ),
   },
   adminUsers: {

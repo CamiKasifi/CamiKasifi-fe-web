@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -8,6 +8,7 @@ import {
   BarChart3,
   Building2,
   ClipboardCheck,
+  Inbox,
   LayoutDashboard,
   LogOut,
   Megaphone,
@@ -18,8 +19,11 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isAdmin, isImam, useAuth } from '@/lib/auth'
+import { api } from '@/lib/api'
 import { Button } from './ui'
 import { MosqueLogo } from './MosqueLogo'
+
+const APPLICATIONS_HREF = '/dashboard/applications'
 
 interface NavItem {
   label: string
@@ -32,6 +36,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: 'Genel Bakış', shortLabel: 'Özet', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Camiler', shortLabel: 'Camiler', href: '/dashboard/mosques', icon: Building2 },
   { label: 'İmamlar', shortLabel: 'İmamlar', href: '/dashboard/imams', icon: UserCog },
+  { label: 'Başvurular', shortLabel: 'Başvuru', href: APPLICATIONS_HREF, icon: Inbox },
   { label: 'Yarışmalar', shortLabel: 'Yarışma', href: '/dashboard/competitions', icon: Trophy },
   { label: 'Rozetler', shortLabel: 'Rozet', href: '/dashboard/badges', icon: Award },
 ]
@@ -54,8 +59,32 @@ export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const { user, logout } = useAuth()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [pendingApplications, setPendingApplications] = useState(0)
 
-  const nav = isAdmin(user) ? ADMIN_NAV : isImam(user) ? IMAM_NAV : []
+  const admin = isAdmin(user)
+
+  // Bekleyen imam başvuru sayısı (nav rozeti). Sayfa değişiminde tazelenir ki
+  // onay/red sonrası rozet güncel kalsın.
+  useEffect(() => {
+    if (!admin) {
+      setPendingApplications(0)
+      return
+    }
+    let active = true
+    void api.adminImamApplications
+      .pendingCount()
+      .then((res) => {
+        if (active) setPendingApplications(res.count)
+      })
+      .catch(() => {
+        // Rozet kritik değil; sessizce geç.
+      })
+    return () => {
+      active = false
+    }
+  }, [admin, pathname])
+
+  const nav = admin ? ADMIN_NAV : isImam(user) ? IMAM_NAV : []
   const roleLabel = isAdmin(user)
     ? 'Yönetici'
     : isImam(user)
@@ -129,6 +158,11 @@ export function Shell({ children }: { children: ReactNode }) {
                       )}
                     />
                     {item.label}
+                    {item.href === APPLICATIONS_HREF && pendingApplications > 0 && (
+                      <span className="ml-auto inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-gold px-1.5 text-[11px] font-bold text-gold-foreground">
+                        {pendingApplications}
+                      </span>
+                    )}
                   </Link>
                 </li>
               )
@@ -269,6 +303,11 @@ export function Shell({ children }: { children: ReactNode }) {
                         active ? 'text-accent' : 'text-muted-foreground',
                       )}
                     />
+                    {item.href === APPLICATIONS_HREF && pendingApplications > 0 && (
+                      <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-gold px-1 text-[10px] font-bold text-gold-foreground">
+                        {pendingApplications}
+                      </span>
+                    )}
                     {active && (
                       <span className="absolute -top-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-gold" />
                     )}
