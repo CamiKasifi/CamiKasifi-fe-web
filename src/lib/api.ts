@@ -20,6 +20,8 @@ export interface UserProfile {
   points?: number | null
   phoneNumber?: string | null
   phoneVisible?: boolean | null
+  city?: string | null
+  district?: string | null
 }
 
 /// `PUT /api/users/me` body. Şifre değişimi backend'de değil Supabase'de
@@ -30,6 +32,13 @@ export interface UserUpdateInput {
   birthday?: string | null
   phoneNumber?: string | null
   phoneVisible?: boolean | null
+  city?: string | null
+  district?: string | null
+}
+
+export interface Province {
+  il: string
+  ilceler: string[]
 }
 
 export interface Mosque {
@@ -490,6 +499,9 @@ export const api = {
   users: {
     update: (input: UserUpdateInput) =>
       request<UserProfile>('PUT', '/api/users/me', input),
+  },
+  provinces: {
+    list: () => request<Province[]>('GET', '/api/provinces'),
   },
   mosques: {
     list: () => request<Mosque[]>('GET', '/api/mosques'),

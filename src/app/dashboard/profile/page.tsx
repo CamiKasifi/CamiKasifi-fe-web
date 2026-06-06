@@ -11,7 +11,7 @@ import {
   Spinner,
 } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
-import { api, ApiError, type UserUpdateInput } from '@/lib/api'
+import { api, ApiError, type Province, type UserUpdateInput } from '@/lib/api'
 import { supabase } from '@/lib/supabaseClient'
 
 export default function ProfilePage() {
@@ -23,13 +23,20 @@ export default function ProfilePage() {
     birthday: string
     phoneNumber: string
     phoneVisible: boolean
+    city: string
+    district: string
   }>({
     name: '',
     surname: '',
     birthday: '',
     phoneNumber: '',
     phoneVisible: false,
+    city: '',
+    district: '',
   })
+
+  const [provinces, setProvinces] = useState<Province[]>([])
+  const [districts, setDistricts] = useState<string[]>([])
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
   const [profileSuccess, setProfileSuccess] = useState<string | null>(null)
@@ -48,15 +55,24 @@ export default function ProfilePage() {
   const [pwSuccess, setPwSuccess] = useState<string | null>(null)
 
   useEffect(() => {
+    api.provinces.list().then(setProvinces).catch(() => {})
+  }, [])
+
+  useEffect(() => {
     if (!user) return
+    const city = user.city ?? ''
     setProfile({
       name: user.name ?? '',
       surname: user.surname ?? '',
       birthday: user.birthday ?? '',
       phoneNumber: user.phoneNumber ?? '',
       phoneVisible: user.phoneVisible ?? false,
+      city,
+      district: user.district ?? '',
     })
-  }, [user])
+    const found = provinces.find((p) => p.il === city)
+    setDistricts(found ? found.ilceler : [])
+  }, [user, provinces])
 
   const submitProfile = async (e: FormEvent) => {
     e.preventDefault()
@@ -70,6 +86,8 @@ export default function ProfilePage() {
         birthday: profile.birthday.trim() || null,
         phoneNumber: profile.phoneNumber.trim() || null,
         phoneVisible: profile.phoneVisible,
+        city: profile.city.trim() || null,
+        district: profile.district.trim() || null,
       }
       await api.users.update(payload)
       await refresh()
@@ -202,6 +220,49 @@ export default function ProfilePage() {
               setProfile({ ...profile, phoneNumber: e.target.value })
             }
           />
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="city">İl</Label>
+            <select
+              id="city"
+              value={profile.city}
+              onChange={(e) => {
+                const city = e.target.value
+                const found = provinces.find((p) => p.il === city)
+                setDistricts(found ? found.ilceler : [])
+                setProfile({ ...profile, city, district: '' })
+              }}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option value="">— Seçiniz —</option>
+              {provinces.map((p) => (
+                <option key={p.il} value={p.il}>
+                  {p.il}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="district">İlçe</Label>
+            <select
+              id="district"
+              value={profile.district}
+              disabled={districts.length === 0}
+              onChange={(e) =>
+                setProfile({ ...profile, district: e.target.value })
+              }
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="">— Seçiniz —</option>
+              {districts.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <label className="flex items-start gap-2.5 rounded-md border border-border bg-muted/30 px-3 py-2.5 text-sm">
