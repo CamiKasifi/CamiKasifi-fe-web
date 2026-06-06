@@ -328,12 +328,15 @@ export interface ImamMosqueApplicationInput {
   roleTitle?: string | null
 }
 
-/** İmam self-kayıt gövdesi. Kimlik (sub/email) Supabase JWT'sinden alınır. */
+/** İmam self-kayıt gövdesi. Kimlik (sub/email) Supabase JWT'sinden alınır.
+ *  Cami listeden seçilmez — serbest metin (cami adı + ilçe + il). */
 export interface ImamRegistrationInput {
   name: string
   surname: string
   phone?: string | null
-  mosqueId: number
+  mosqueName: string
+  district: string
+  city: string
   note?: string | null
   roleTitle?: string | null
 }

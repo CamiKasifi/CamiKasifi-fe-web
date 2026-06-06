@@ -1,24 +1,12 @@
 'use client'
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-} from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import Link from 'next/link'
-import { Check, Eye, EyeOff, MailCheck, Search } from 'lucide-react'
-import {
-  Button,
-  ErrorBanner,
-  Input,
-  Label,
-  Spinner,
-} from '@/components/ui'
+import { Eye, EyeOff, MailCheck } from 'lucide-react'
+import { Button, ErrorBanner, Input, Label } from '@/components/ui'
 import { MosqueLogo } from '@/components/MosqueLogo'
 import { supabase } from '@/lib/supabaseClient'
-import { api, ApiError, type Mosque } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { formatApiError } from '@/lib/hooks'
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ''
@@ -60,11 +48,10 @@ export default function RegisterPage() {
   const [roleTitle, setRoleTitle] = useState('')
   const [note, setNote] = useState('')
 
-  // Cami seçimi (tek).
-  const [q, setQ] = useState('')
-  const [results, setResults] = useState<Mosque[]>([])
-  const [searching, setSearching] = useState(false)
-  const [selectedMosque, setSelectedMosque] = useState<Mosque | null>(null)
+  // Cami bilgisi — serbest metin (listeden seçim yok; provisioning öncesi 401'i önler).
+  const [mosqueName, setMosqueName] = useState('')
+  const [district, setDistrict] = useState('')
+  const [city, setCity] = useState('')
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -121,37 +108,12 @@ export default function RegisterPage() {
     }
   }
 
-  // Debounced cami arama (350 ms).
-  useEffect(() => {
-    const trimmed = q.trim()
-    if (!trimmed) {
-      setResults([])
-      return
-    }
-    const t = setTimeout(async () => {
-      setSearching(true)
-      try {
-        setResults(await api.mosques.search({ q: trimmed, limit: 50 }))
-      } catch {
-        // Sessizce geç — kullanıcı tekrar deneyebilir.
-      } finally {
-        setSearching(false)
-      }
-    }, 350)
-    return () => clearTimeout(t)
-  }, [q])
-
-  const displayMosques = useMemo(() => {
-    if (!selectedMosque) return results
-    return [selectedMosque, ...results.filter((m) => m.id !== selectedMosque.id)]
-  }, [selectedMosque, results])
-
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
 
-    if (!selectedMosque) {
-      setError('Lütfen bir cami seç.')
+    if (!mosqueName.trim() || !district.trim() || !city.trim()) {
+      setError('Lütfen cami adı, ilçe ve il bilgisini gir.')
       return
     }
     if (TURNSTILE_SITE_KEY && !captchaToken) {
@@ -187,7 +149,9 @@ export default function RegisterPage() {
         name: name.trim(),
         surname: surname.trim(),
         phone: phone.trim() || null,
-        mosqueId: selectedMosque.id,
+        mosqueName: mosqueName.trim(),
+        district: district.trim(),
+        city: city.trim(),
         note: note.trim() || null,
         roleTitle: roleTitle.trim() || null,
       })
@@ -334,64 +298,36 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label>Cami</Label>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Label htmlFor="reg-mosque">Cami adı</Label>
+                <Input
+                  id="reg-mosque"
+                  value={mosqueName}
+                  onChange={(e) => setMosqueName(e.target.value)}
+                  placeholder="Örn: Merkez Camii"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="reg-district">İlçe</Label>
                   <Input
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    placeholder="Cami adı ara…"
-                    className="pl-9"
-                    aria-label="Cami ara"
+                    id="reg-district"
+                    value={district}
+                    onChange={(e) => setDistrict(e.target.value)}
+                    placeholder="Örn: Üsküdar"
+                    required
                   />
                 </div>
-                <div className="max-h-44 space-y-1 overflow-y-auto rounded-md border border-border bg-muted/20 p-1">
-                  {searching ? (
-                    <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
-                      <Spinner className="h-3.5 w-3.5" /> Aranıyor…
-                    </div>
-                  ) : displayMosques.length === 0 ? (
-                    <p className="px-3 py-4 text-center text-xs text-muted-foreground">
-                      {q.trim() ? 'Sonuç bulunamadı.' : 'Cami adı yaz.'}
-                    </p>
-                  ) : (
-                    displayMosques.map((m) => {
-                      const isSelected = selectedMosque?.id === m.id
-                      return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => setSelectedMosque(m)}
-                          className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors ${
-                            isSelected
-                              ? 'bg-accent/10 hover:bg-accent/15'
-                              : 'hover:bg-muted'
-                          }`}
-                        >
-                          <span
-                            aria-hidden
-                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                              isSelected
-                                ? 'border-accent bg-accent text-accent-foreground'
-                                : 'border-border bg-surface'
-                            }`}
-                          >
-                            {isSelected && <Check className="h-3.5 w-3.5" />}
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-medium text-foreground">
-                              {m.name}
-                            </span>
-                            <span className="block truncate text-xs text-muted-foreground">
-                              {[m.neighbourhood, m.district, m.city]
-                                .filter(Boolean)
-                                .join(', ')}
-                            </span>
-                          </span>
-                        </button>
-                      )
-                    })
-                  )}
+                <div className="space-y-1.5">
+                  <Label htmlFor="reg-city">İl</Label>
+                  <Input
+                    id="reg-city"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="Örn: İstanbul"
+                    required
+                  />
                 </div>
               </div>
 
