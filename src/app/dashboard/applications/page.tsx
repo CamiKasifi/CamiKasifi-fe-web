@@ -158,15 +158,32 @@ export default function ApplicationsPage() {
 
                   <div className="flex items-center gap-1.5 pt-1 text-sm">
                     <Building2 className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium text-foreground">
-                      {a.mosqueName}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      ·{' '}
-                      {[a.mosqueNeighbourhood, a.mosqueDistrict, a.mosqueCity]
-                        .filter(Boolean)
-                        .join(', ')}
-                    </span>
+                    {a.mosqueName ? (
+                      <>
+                        <span className="font-medium text-foreground">
+                          {a.mosqueName}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          ·{' '}
+                          {[a.mosqueNeighbourhood, a.mosqueDistrict, a.mosqueCity]
+                            .filter(Boolean)
+                            .join(', ')}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium text-foreground">
+                          {a.claimedMosqueName ?? '—'}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          ·{' '}
+                          {[a.claimedMosqueDistrict, a.claimedMosqueCity]
+                            .filter(Boolean)
+                            .join(', ')}{' '}
+                          <span className="italic">(imamın bildirdiği)</span>
+                        </span>
+                      </>
+                    )}
                   </div>
 
                   {a.note && (
@@ -252,19 +269,27 @@ function ApproveModal({
     id: number
     name: string
     sub: string
-  }>({
-    id: application.mosqueId,
-    name: application.mosqueName,
-    sub: [
-      application.mosqueNeighbourhood,
-      application.mosqueDistrict,
-      application.mosqueCity,
-    ]
-      .filter(Boolean)
-      .join(', '),
-  })
-  const [changing, setChanging] = useState(false)
-  const [q, setQ] = useState('')
+  } | null>(
+    application.mosqueId
+      ? {
+          id: application.mosqueId,
+          name: application.mosqueName ?? '',
+          sub: [
+            application.mosqueNeighbourhood,
+            application.mosqueDistrict,
+            application.mosqueCity,
+          ]
+            .filter(Boolean)
+            .join(', '),
+        }
+      : null,
+  )
+  // Atanmış cami yoksa (self-kayıt) admin gerçek camiyi seçsin diye arama açık
+  // gelir; kutu, imamın bildirdiği cami adıyla ön-doldurulur.
+  const [changing, setChanging] = useState(!application.mosqueId)
+  const [q, setQ] = useState(
+    application.mosqueId ? '' : (application.claimedMosqueName ?? ''),
+  )
   const [results, setResults] = useState<Mosque[]>([])
   const [searching, setSearching] = useState(false)
   const [note, setNote] = useState('')
@@ -301,7 +326,7 @@ function ApproveModal({
     setError(null)
     try {
       await api.adminImamApplications.approve(application.id, {
-        mosqueId: chosen.id,
+        mosqueId: chosen?.id ?? null,
         decisionNote: note.trim() || null,
       })
       onDone()
@@ -312,7 +337,7 @@ function ApproveModal({
     }
   }
 
-  const changed = chosen.id !== application.mosqueId
+  const changed = (chosen?.id ?? null) !== application.mosqueId
 
   return (
     <Modal
@@ -341,11 +366,23 @@ function ApproveModal({
                 Atanacak cami {changed && '(değiştirildi)'}
               </p>
               <p className="truncate font-medium text-foreground">
-                {chosen.name}
+                {chosen ? chosen.name : 'Henüz cami seçilmedi'}
               </p>
-              {chosen.sub && (
+              {chosen?.sub && (
                 <p className="truncate text-xs text-muted-foreground">
                   {chosen.sub}
+                </p>
+              )}
+              {!chosen && application.claimedMosqueName && (
+                <p className="truncate text-xs text-muted-foreground">
+                  İmamın bildirdiği:{' '}
+                  {[
+                    application.claimedMosqueName,
+                    application.claimedMosqueDistrict,
+                    application.claimedMosqueCity,
+                  ]
+                    .filter(Boolean)
+                    .join(', ')}
                 </p>
               )}
             </div>
@@ -466,7 +503,7 @@ function RejectModal({
       open
       onClose={onClose}
       title="Başvuruyu reddet"
-      description={`${applicantName} adlı imamın "${application.mosqueName}" başvurusunu reddet.`}
+      description={`${applicantName} adlı imamın "${application.mosqueName ?? application.claimedMosqueName ?? ''}" başvurusunu reddet.`}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={submitting}>

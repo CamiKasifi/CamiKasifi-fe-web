@@ -306,11 +306,16 @@ export interface ImamMosqueApplication {
   applicantName: string | null
   applicantSurname: string | null
   applicantEmail: string
-  mosqueId: number
-  mosqueName: string
-  mosqueCity: string
-  mosqueDistrict: string
-  mosqueNeighbourhood: string
+  // Atanan gerçek cami — self-kayıtta henüz atanmamışsa null.
+  mosqueId: number | null
+  mosqueName: string | null
+  mosqueCity: string | null
+  mosqueDistrict: string | null
+  mosqueNeighbourhood: string | null
+  // İmamın self-kayıtta bildirdiği cami (serbest metin, bilgi amaçlı).
+  claimedMosqueName: string | null
+  claimedMosqueDistrict: string | null
+  claimedMosqueCity: string | null
   note: string | null
   contactPhone: string | null
   roleTitle: string | null
