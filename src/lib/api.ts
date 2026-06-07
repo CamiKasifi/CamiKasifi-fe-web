@@ -439,6 +439,18 @@ export interface BadgeInput {
   sortOrder?: number | null
 }
 
+/* ───── Puan yapılandırması (admin) ───── */
+
+export interface PointsConfig {
+  fajrPoints: number
+  dhuhrPoints: number
+  asrPoints: number
+  maghribPoints: number
+  ishaPoints: number
+  fullDayBonus: number
+  sameSalahStreakBonus: number
+}
+
 export class ApiError extends Error {
   status: number
   fieldErrors?: Array<{ field: string; message: string }>
@@ -630,6 +642,11 @@ export const api = {
         `/api/admin/users/${userId}/mosques`,
         { mosqueIds },
       ),
+  },
+  adminConfig: {
+    getPoints: () => request<PointsConfig>('GET', '/api/admin/config/points'),
+    updatePoints: (input: PointsConfig) =>
+      request<PointsConfig>('PUT', '/api/admin/config/points', input),
   },
   adminBadges: {
     list: () => request<AdminBadge[]>('GET', '/api/admin/badges'),

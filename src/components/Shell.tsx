@@ -13,6 +13,7 @@ import {
   LogOut,
   Megaphone,
   Menu,
+  SlidersHorizontal,
   Trophy,
   UserCog,
   X,
@@ -39,6 +40,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: 'Başvurular', shortLabel: 'Başvuru', href: APPLICATIONS_HREF, icon: Inbox },
   { label: 'Yarışmalar', shortLabel: 'Yarışma', href: '/dashboard/competitions', icon: Trophy },
   { label: 'Rozetler', shortLabel: 'Rozet', href: '/dashboard/badges', icon: Award },
+  { label: 'Puan Ayarları', shortLabel: 'Puanlar', href: '/dashboard/config', icon: SlidersHorizontal },
 ]
 
 const IMAM_NAV: NavItem[] = [
