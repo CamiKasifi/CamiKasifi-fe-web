@@ -67,6 +67,11 @@ export interface Competition {
   id: number
   name: string
   centralMosqueId?: number | null
+  startedAt?: string | null
+  endsAt?: string | null
+  closedAt?: string | null
+  status?: string | null
+  top3?: LeaderboardEntry[] | null
 }
 
 export interface LeaderboardEntry {
@@ -659,8 +664,11 @@ export const api = {
   },
   competitions: {
     list: () => request<Competition[]>('GET', '/api/competitions'),
-    create: (input: { name: string; centralMosqueId?: number | null }) =>
-      request<Competition>('POST', '/api/competitions', input),
+    create: (input: {
+      name: string
+      centralMosqueId?: number | null
+      endsAt?: string | null
+    }) => request<Competition>('POST', '/api/competitions', input),
     leaderboard: (id: number) =>
       request<LeaderboardEntry[]>('GET', `/api/competitions/${id}/leaderboard`),
     manualAttendance: (
@@ -675,6 +683,14 @@ export const api = {
         `/api/competitions/${competitionId}/manual-attendance`,
         input,
       ),
+    close: (id: number) =>
+      request<Competition>('POST', `/api/competitions/${id}/close`, {}),
+    updateEndsAt: (id: number, endsAt: string) =>
+      request<Competition>('PATCH', `/api/competitions/${id}/ends-at`, {
+        endsAt,
+      }),
+    removeParticipant: (id: number, personId: number) =>
+      request<void>('DELETE', `/api/competitions/${id}/participants/${personId}`),
   },
   approvals: {
     list: (competitionId?: number) => {

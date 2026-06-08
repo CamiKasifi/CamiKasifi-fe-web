@@ -1,8 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import {
+  Button,
   EmptyState,
   ErrorBanner,
+  Modal,
   Spinner,
   Table,
   TD,
@@ -11,16 +14,42 @@ import {
   TR,
 } from '@/components/ui'
 import { api, type LeaderboardEntry } from '@/lib/api'
-import { useFetchData } from '@/lib/hooks'
+import { useFetchData, formatApiError } from '@/lib/hooks'
 
-/// Yarışma sıralaması — basit liste; yarışma değişince otomatik refetch.
-export function LeaderboardTab({ competitionId }: { competitionId: number }) {
-  const { data, loading, error } = useFetchData<LeaderboardEntry[]>(
+const MEDALS = ['🥇', '🥈', '🥉']
+
+export function LeaderboardTab({
+  competitionId,
+  canManage = false,
+}: {
+  competitionId: number
+  canManage?: boolean
+}) {
+  const { data, loading, error, refresh: refetch } = useFetchData<LeaderboardEntry[]>(
     () => api.competitions.leaderboard(competitionId),
     [competitionId],
     { initialData: [] },
   )
   const board = data ?? []
+
+  const [removing, setRemoving] = useState<number | null>(null)
+  const [removeError, setRemoveError] = useState<string | null>(null)
+  const [confirmEntry, setConfirmEntry] = useState<LeaderboardEntry | null>(null)
+
+  const handleRemove = async () => {
+    if (!confirmEntry) return
+    setRemoving(confirmEntry.personId)
+    setRemoveError(null)
+    try {
+      await api.competitions.removeParticipant(competitionId, confirmEntry.personId)
+      setConfirmEntry(null)
+      await refetch()
+    } catch (err) {
+      setRemoveError(formatApiError(err, 'Katılımcı çıkarılamadı.'))
+    } finally {
+      setRemoving(null)
+    }
+  }
 
   if (loading) {
     return (
@@ -39,27 +68,81 @@ export function LeaderboardTab({ competitionId }: { competitionId: number }) {
     )
   }
   return (
-    <Table>
-      <THead>
-        <TR>
-          <TH className="w-12">#</TH>
-          <TH>Katılımcı</TH>
-          <TH className="text-right">Puan</TH>
-        </TR>
-      </THead>
-      <tbody>
-        {board.map((row) => (
-          <TR key={row.personId}>
-            <TD className="tabular-nums text-muted-foreground">{row.rank}</TD>
-            <TD className="font-medium">
-              {row.name} {row.surname}
-            </TD>
-            <TD className="text-right font-mono tabular-nums">
-              {row.totalPoint}
-            </TD>
+    <>
+      <Table>
+        <THead>
+          <TR>
+            <TH className="w-12">#</TH>
+            <TH>Katılımcı</TH>
+            <TH className="text-right">Puan</TH>
+            {canManage && <TH className="w-16" />}
           </TR>
-        ))}
-      </tbody>
-    </Table>
+        </THead>
+        <tbody>
+          {board.map((row) => {
+            const medal = row.rank <= 3 ? MEDALS[row.rank - 1] : null
+            return (
+              <TR key={row.personId}>
+                <TD className="tabular-nums text-muted-foreground">
+                  {medal ? (
+                    <span title={`${row.rank}. sıra`}>{medal}</span>
+                  ) : (
+                    row.rank
+                  )}
+                </TD>
+                <TD className="font-medium">
+                  {row.name} {row.surname}
+                </TD>
+                <TD className="text-right font-mono tabular-nums">
+                  {row.totalPoint}
+                </TD>
+                {canManage && (
+                  <TD className="text-right">
+                    <Button
+                      variant="ghost"
+                      onClick={() => setConfirmEntry(row)}
+                      className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                    >
+                      Çıkar
+                    </Button>
+                  </TD>
+                )}
+              </TR>
+            )
+          })}
+        </tbody>
+      </Table>
+
+      <Modal
+        open={!!confirmEntry}
+        onClose={() => setConfirmEntry(null)}
+        title="Katılımcıyı çıkar"
+        description={
+          confirmEntry
+            ? `"${confirmEntry.name} ${confirmEntry.surname}" adlı kişiyi yarışmadan çıkarmak istediğinden emin misin?`
+            : undefined
+        }
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmEntry(null)}
+              disabled={!!removing}
+            >
+              Vazgeç
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRemove}
+              loading={!!removing}
+            >
+              Evet, Çıkar
+            </Button>
+          </>
+        }
+      >
+        <ErrorBanner message={removeError} />
+      </Modal>
+    </>
   )
 }

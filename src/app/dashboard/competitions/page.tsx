@@ -3,10 +3,13 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import {
   BarChart3,
+  Calendar,
+  CalendarClock,
   CalendarPlus,
   Gift,
   Plus,
   ShieldCheck,
+  StopCircle,
   Trophy,
 } from 'lucide-react'
 import {
@@ -29,6 +32,7 @@ import { cn } from '@/lib/utils'
 import { isAdmin, isImam, useAuth } from '@/lib/auth'
 import { api, type Competition, type Mosque } from '@/lib/api'
 import { formatApiError } from '@/lib/hooks'
+import { DateTimePicker } from '@/components/DateTimePicker'
 import { IncentivesTab } from '@/components/competitions/IncentivesTab'
 import { LeaderboardTab } from '@/components/competitions/LeaderboardTab'
 import { ManualAttendanceTab } from '@/components/competitions/ManualAttendanceTab'
@@ -37,16 +41,16 @@ import { TabButton } from '@/components/competitions/TabButton'
 
 type Tab = 'leaderboard' | 'roles' | 'incentives' | 'manual'
 
-/// Yarışma yönetim sayfası — orkestratör.
-///
-/// Bu dosyada SADECE sayfa-seviyesi kaygılar kalır:
-///   - Yarışma listesi + seçim
-///   - Tab state (`leaderboard` / `roles` / `incentives`)
-///   - "Yeni Yarışma" modal akışı
-///
-/// Tab içerikleri `@/components/competitions/*` altında ayrı dosyalardadır.
-/// Bu sayede tab başına state/efekt sıkıca paketlenir, sayfa dosyası 1k+ satırdan
-/// 200 küçüğe düşer ve her tab tek başına test edilebilir.
+function fmtDate(iso?: string | null) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getFullYear()}`
+}
+
+function isClosed(c: Competition) {
+  return c.status === 'CLOSED' || !!c.closedAt
+}
+
 export default function CompetitionsPage() {
   const { user } = useAuth()
   const admin = isAdmin(user)
@@ -61,11 +65,24 @@ export default function CompetitionsPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [tab, setTab] = useState<Tab>('leaderboard')
 
+  // Create modal
   const [modalOpen, setModalOpen] = useState(false)
   const [name, setName] = useState('')
   const [centralMosqueId, setCentralMosqueId] = useState<string>('')
+  const [createEndsAt, setCreateEndsAt] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+
+  // Close confirm modal
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
+  const [closeSubmitting, setCloseSubmitting] = useState(false)
+  const [closeError, setCloseError] = useState<string | null>(null)
+
+  // Update endsAt modal
+  const [updateEndsAtOpen, setUpdateEndsAtOpen] = useState(false)
+  const [newEndsAt, setNewEndsAt] = useState('')
+  const [endsAtSubmitting, setEndsAtSubmitting] = useState(false)
+  const [endsAtError, setEndsAtError] = useState<string | null>(null)
 
   const refresh = async () => {
     setLoading(true)
@@ -95,6 +112,7 @@ export default function CompetitionsPage() {
   const openCreate = () => {
     setName('')
     setCentralMosqueId('')
+    setCreateEndsAt('')
     setFormError(null)
     setModalOpen(true)
   }
@@ -107,6 +125,7 @@ export default function CompetitionsPage() {
       const created = await api.competitions.create({
         name: name.trim(),
         centralMosqueId: centralMosqueId ? Number(centralMosqueId) : null,
+        endsAt: createEndsAt ? new Date(createEndsAt).toISOString() : null,
       })
       setModalOpen(false)
       setSelectedId(created.id)
@@ -118,10 +137,48 @@ export default function CompetitionsPage() {
     }
   }
 
+  const handleClose = async () => {
+    if (!selectedId) return
+    setCloseSubmitting(true)
+    setCloseError(null)
+    try {
+      await api.competitions.close(selectedId)
+      setCloseConfirmOpen(false)
+      await refresh()
+    } catch (err) {
+      setCloseError(formatApiError(err, 'Yarışma kapatılamadı.'))
+    } finally {
+      setCloseSubmitting(false)
+    }
+  }
+
+  const openUpdateEndsAt = () => {
+    const current = selectedCompetition?.endsAt
+    setNewEndsAt(current ? current.slice(0, 16) : '')
+    setEndsAtError(null)
+    setUpdateEndsAtOpen(true)
+  }
+
+  const handleUpdateEndsAt = async () => {
+    if (!selectedId || !newEndsAt) return
+    setEndsAtSubmitting(true)
+    setEndsAtError(null)
+    try {
+      await api.competitions.updateEndsAt(selectedId, new Date(newEndsAt).toISOString())
+      setUpdateEndsAtOpen(false)
+      await refresh()
+    } catch (err) {
+      setEndsAtError(formatApiError(err, 'Bitiş tarihi güncellenemedi.'))
+    } finally {
+      setEndsAtSubmitting(false)
+    }
+  }
+
   const selectedCompetition = competitions.find((c) => c.id === selectedId)
   const centralMosque = selectedCompetition?.centralMosqueId
     ? mosques.find((m) => m.id === selectedCompetition.centralMosqueId)
     : null
+  const selectedIsClosed = selectedCompetition ? isClosed(selectedCompetition) : false
 
   return (
     <>
@@ -162,6 +219,7 @@ export default function CompetitionsPage() {
               <ul className="space-y-1">
                 {competitions.map((c) => {
                   const active = c.id === selectedId
+                  const closed = isClosed(c)
                   return (
                     <li key={c.id}>
                       <button
@@ -179,7 +237,19 @@ export default function CompetitionsPage() {
                         )}
                       >
                         <Trophy className="h-4 w-4 shrink-0" />
-                        <span className="truncate font-medium">{c.name}</span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block truncate font-medium">{c.name}</span>
+                          {(c.startedAt || c.endsAt) && (
+                            <span className="block text-[10px] text-muted-foreground">
+                              {fmtDate(c.startedAt)} – {fmtDate(c.endsAt)}
+                            </span>
+                          )}
+                        </span>
+                        {closed && (
+                          <Badge variant="destructive" className="shrink-0 text-[9px] py-0 px-1.5">
+                            KAPANDI
+                          </Badge>
+                        )}
                       </button>
                     </li>
                   )
@@ -191,7 +261,7 @@ export default function CompetitionsPage() {
           <Card>
             <CardHeader>
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="flex-1 min-w-0">
                   <CardTitle>
                     {selectedCompetition?.name ?? 'Yarışma seç'}
                   </CardTitle>
@@ -204,9 +274,39 @@ export default function CompetitionsPage() {
                       · {centralMosque.district}
                     </p>
                   )}
+                  {selectedCompetition && (selectedCompetition.startedAt || selectedCompetition.endsAt || selectedCompetition.closedAt) && (
+                    <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                      <Calendar className="h-3 w-3 shrink-0" />
+                      {fmtDate(selectedCompetition.startedAt)}
+                      {' – '}
+                      {selectedCompetition.closedAt
+                        ? `Kapandı: ${fmtDate(selectedCompetition.closedAt)}`
+                        : fmtDate(selectedCompetition.endsAt)}
+                    </p>
+                  )}
+                  {canCreate && selectedCompetition && !selectedIsClosed && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={openUpdateEndsAt}
+                        className="h-7 px-2.5 text-xs"
+                      >
+                        <CalendarClock className="h-3.5 w-3.5" /> Bitiş Tarihini Güncelle
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => setCloseConfirmOpen(true)}
+                        className="h-7 px-2.5 text-xs"
+                      >
+                        <StopCircle className="h-3.5 w-3.5" /> Yarışmayı Bitir
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 {selectedCompetition && (
-                  <Badge variant="default">#{selectedCompetition.id}</Badge>
+                  <Badge variant={selectedIsClosed ? 'destructive' : 'default'}>
+                    {selectedIsClosed ? 'KAPANDI' : `#${selectedCompetition.id}`}
+                  </Badge>
                 )}
               </div>
 
@@ -256,7 +356,10 @@ export default function CompetitionsPage() {
                   Detay için bir yarışma seç.
                 </p>
               ) : tab === 'leaderboard' ? (
-                <LeaderboardTab competitionId={selectedCompetition.id} />
+                <LeaderboardTab
+                  competitionId={selectedCompetition.id}
+                  canManage={canCreate && !selectedIsClosed}
+                />
               ) : tab === 'roles' ? (
                 <RolesTab
                   competitionId={selectedCompetition.id}
@@ -279,11 +382,12 @@ export default function CompetitionsPage() {
         </div>
       )}
 
+      {/* Yeni Yarışma Modal */}
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         title="Yeni yarışma"
-        description="İsteğe bağlı olarak bir merkez cami seçebilirsin."
+        description="İsteğe bağlı olarak bir merkez cami ve bitiş tarihi seçebilirsin."
         footer={
           <>
             <Button
@@ -334,7 +438,76 @@ export default function CompetitionsPage() {
               ))}
             </Select>
           </div>
+
+          <div className="space-y-1.5">
+            <Label>Bitiş tarihi (opsiyonel)</Label>
+            <DateTimePicker
+              value={createEndsAt}
+              onChange={setCreateEndsAt}
+            />
+          </div>
         </form>
+      </Modal>
+
+      {/* Yarışmayı Bitir — onay modalı */}
+      <Modal
+        open={closeConfirmOpen}
+        onClose={() => setCloseConfirmOpen(false)}
+        title="Yarışmayı bitir"
+        description={`"${selectedCompetition?.name}" yarışmasını şimdi kapatmak istediğinden emin misin? Bu işlem geri alınamaz.`}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setCloseConfirmOpen(false)}
+              disabled={closeSubmitting}
+            >
+              Vazgeç
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleClose}
+              loading={closeSubmitting}
+            >
+              Evet, Kapat
+            </Button>
+          </>
+        }
+      >
+        <ErrorBanner message={closeError} />
+      </Modal>
+
+      {/* Bitiş Tarihini Güncelle Modal */}
+      <Modal
+        open={updateEndsAtOpen}
+        onClose={() => setUpdateEndsAtOpen(false)}
+        title="Bitiş tarihini güncelle"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setUpdateEndsAtOpen(false)}
+              disabled={endsAtSubmitting}
+            >
+              Vazgeç
+            </Button>
+            <Button
+              onClick={handleUpdateEndsAt}
+              loading={endsAtSubmitting}
+              disabled={!newEndsAt}
+            >
+              Güncelle
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <ErrorBanner message={endsAtError} />
+          <div className="space-y-1.5">
+            <Label>Yeni bitiş tarihi</Label>
+            <DateTimePicker value={newEndsAt} onChange={setNewEndsAt} />
+          </div>
+        </div>
       </Modal>
     </>
   )
