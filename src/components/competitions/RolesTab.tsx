@@ -419,9 +419,11 @@ export function RolesTab({
                       />
                       <span className="flex-1">
                         <span className="font-medium">{m.name}</span>
-                        <span className="ml-1 text-xs text-muted-foreground">
-                          ({m.district})
-                        </span>
+                        {m.neighbourhood && (
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            ({m.neighbourhood})
+                          </span>
+                        )}
                       </span>
                     </label>
                   )

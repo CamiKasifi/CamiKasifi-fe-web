@@ -120,9 +120,7 @@ export default function ImamsPage() {
     return mosques.filter(
       (m) =>
         m.name.toLowerCase().includes(q) ||
-        m.city.toLowerCase().includes(q) ||
-        m.district.toLowerCase().includes(q) ||
-        m.neighbourhood.toLowerCase().includes(q),
+        (m.neighbourhood ?? '').toLowerCase().includes(q),
     )
   }, [mosques, mosqueQuery])
 
@@ -378,7 +376,7 @@ export default function ImamsPage() {
                         {m.name}
                       </span>
                       <span className="block truncate text-xs text-muted-foreground">
-                        {m.neighbourhood}, {m.district} · {m.city}
+                        {m.neighbourhood}
                       </span>
                     </span>
                   </label>

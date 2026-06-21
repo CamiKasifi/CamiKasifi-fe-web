@@ -257,7 +257,7 @@ export default function AnalyticsPage() {
             >
               {mosques.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.name} — {m.district}, {m.city}
+                  {m.name}{m.neighbourhood ? ` — ${m.neighbourhood}` : ''}
                 </option>
               ))}
             </Select>

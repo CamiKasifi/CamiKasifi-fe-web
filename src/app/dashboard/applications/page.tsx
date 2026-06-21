@@ -425,9 +425,7 @@ function ApproveModal({
                         setChosen({
                           id: m.id,
                           name: m.name,
-                          sub: [m.neighbourhood, m.district, m.city]
-                            .filter(Boolean)
-                            .join(', '),
+                          sub: m.neighbourhood ?? '',
                         })
                         setChanging(false)
                         setQ('')
@@ -436,9 +434,7 @@ function ApproveModal({
                     >
                       <span className="truncate font-medium">{m.name}</span>
                       <span className="truncate text-xs text-muted-foreground">
-                        {[m.neighbourhood, m.district, m.city]
-                          .filter(Boolean)
-                          .join(', ')}
+                        {m.neighbourhood ?? ''}
                       </span>
                     </button>
                   ))

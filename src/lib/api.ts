@@ -20,8 +20,8 @@ export interface UserProfile {
   points?: number | null
   phoneNumber?: string | null
   phoneVisible?: boolean | null
-  city?: string | null
-  district?: string | null
+  districtId?: number | null
+  neighbourhood?: string | null
 }
 
 /// `PUT /api/users/me` body. Şifre değişimi backend'de değil Supabase'de
@@ -32,31 +32,35 @@ export interface UserUpdateInput {
   birthday?: string | null
   phoneNumber?: string | null
   phoneVisible?: boolean | null
-  city?: string | null
-  district?: string | null
+  districtId?: number | null
+  neighbourhood?: string | null
+}
+
+export interface ProvinceDistrict {
+  id: number
+  ad: string
 }
 
 export interface Province {
+  ilId: number
   il: string
-  ilceler: string[]
+  ilceler: ProvinceDistrict[]
 }
 
 export interface Mosque {
   id: number
   name: string
-  city: string
-  district: string
-  neighbourhood: string
+  neighbourhood: string | null
   radius: number
   latitude: number
   longitude: number
+  districtId: number | null
   osmId?: number | null
 }
 
 export interface MosqueInput {
   name: string
-  city: string
-  district: string
+  districtId: number
   neighbourhood: string
   radius: number
   latitude: number
@@ -153,12 +157,11 @@ export interface MosqueTopAttendee {
 export interface MosqueProfile {
   id: number
   name: string
-  city: string
-  district: string
-  neighbourhood: string
+  neighbourhood: string | null
   radius: number | null
   latitude: number | null
   longitude: number | null
+  districtId: number | null
   historyText: string | null
   photoUrl: string | null
   imams: MosqueImamInfo[]
@@ -530,15 +533,12 @@ export const api = {
       request<MosqueAnnouncement[]>('GET', `/api/mosques/${id}/events`),
     search: (params: {
       q?: string
-      city?: string
-      district?: string
+      districtId?: number
       limit?: number
     }) => {
       const usp = new URLSearchParams()
       if (params.q && params.q.trim()) usp.set('q', params.q.trim())
-      if (params.city && params.city.trim()) usp.set('city', params.city.trim())
-      if (params.district && params.district.trim())
-        usp.set('district', params.district.trim())
+      if (params.districtId != null) usp.set('districtId', String(params.districtId))
       if (params.limit != null) usp.set('limit', String(params.limit))
       const qs = usp.toString()
       return request<Mosque[]>(

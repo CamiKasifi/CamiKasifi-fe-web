@@ -26,6 +26,7 @@ import {
   type Mosque,
   type MosqueInput,
   type Province,
+  type ProvinceDistrict,
 } from '@/lib/api'
 import { formatApiError } from '@/lib/hooks'
 import { ImamMosqueApplyModal } from '@/components/mosques/ImamMosqueApplyModal'
@@ -46,8 +47,7 @@ const MosqueMapPicker = dynamic(
 
 const EMPTY: MosqueInput = {
   name: '',
-  city: '',
-  district: '',
+  districtId: 0,
   neighbourhood: '',
   radius: 500,
   latitude: 0,
@@ -99,7 +99,8 @@ export default function MosquesPage() {
 
   // Admin cami formu için il/ilçe dropdown
   const [provinces, setProvinces] = useState<Province[]>([])
-  const [formDistricts, setFormDistricts] = useState<string[]>([])
+  const [selectedProvince, setSelectedProvince] = useState<Province | null>(null)
+  const [formDistricts, setFormDistricts] = useState<ProvinceDistrict[]>([])
 
   // İmam için cami başvuru modalı
   const [applyOpen, setApplyOpen] = useState(false)
@@ -146,15 +147,14 @@ export default function MosquesPage() {
     return mosques.filter(
       (m) =>
         m.name.toLowerCase().includes(q) ||
-        m.city.toLowerCase().includes(q) ||
-        m.district.toLowerCase().includes(q) ||
-        m.neighbourhood.toLowerCase().includes(q),
+        (m.neighbourhood ?? '').toLowerCase().includes(q),
     )
   }, [mosques, search])
 
   const openCreate = () => {
     setEditing(null)
     setForm(EMPTY)
+    setSelectedProvince(null)
     setFormDistricts([])
     setFormError(null)
     setModalOpen(true)
@@ -164,14 +164,18 @@ export default function MosquesPage() {
     setEditing(m)
     setForm({
       name: m.name,
-      city: m.city,
-      district: m.district,
-      neighbourhood: m.neighbourhood,
+      districtId: m.districtId ?? 0,
+      neighbourhood: m.neighbourhood ?? '',
       radius: m.radius,
       latitude: m.latitude,
       longitude: m.longitude,
     })
-    const found = provinces.find((p) => p.il === m.city)
+    const found = m.districtId
+      ? provinces.find((p) =>
+          p.ilceler.some((d) => d.id === m.districtId),
+        ) ?? null
+      : null
+    setSelectedProvince(found)
     setFormDistricts(found ? found.ilceler : [])
     setFormError(null)
     setModalOpen(true)
@@ -274,7 +278,7 @@ export default function MosquesPage() {
               <TR key={m.id}>
                 <TD className="font-medium">{m.name}</TD>
                 <TD className="text-muted-foreground">
-                  {m.neighbourhood}, {m.district} · {m.city}
+                  {m.neighbourhood}
                 </TD>
                 <TD className="text-right tabular-nums">{m.radius} m</TD>
                 <TD className="text-right font-mono text-xs text-muted-foreground">
@@ -424,18 +428,20 @@ export default function MosquesPage() {
                 <select
                   id="city"
                   required
-                  value={form.city}
+                  value={selectedProvince?.ilId ?? ''}
                   onChange={(e) => {
-                    const city = e.target.value
-                    const found = provinces.find((p) => p.il === city)
+                    const found = provinces.find(
+                      (p) => p.ilId === Number(e.target.value),
+                    ) ?? null
+                    setSelectedProvince(found)
                     setFormDistricts(found ? found.ilceler : [])
-                    setForm({ ...form, city, district: '' })
+                    setForm({ ...form, districtId: 0 })
                   }}
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
                   <option value="">— Seçiniz —</option>
                   {provinces.map((p) => (
-                    <option key={p.il} value={p.il}>
+                    <option key={p.ilId} value={p.ilId}>
                       {p.il}
                     </option>
                   ))}
@@ -446,17 +452,17 @@ export default function MosquesPage() {
                 <select
                   id="district"
                   required
-                  value={form.district}
+                  value={form.districtId || ''}
                   disabled={formDistricts.length === 0}
                   onChange={(e) =>
-                    setForm({ ...form, district: e.target.value })
+                    setForm({ ...form, districtId: Number(e.target.value) })
                   }
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="">— Seçiniz —</option>
                   {formDistricts.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
+                    <option key={d.id} value={d.id}>
+                      {d.ad}
                     </option>
                   ))}
                 </select>

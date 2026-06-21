@@ -271,7 +271,7 @@ export default function CompetitionsPage() {
                       <span className="font-medium text-foreground">
                         {centralMosque.name}
                       </span>{' '}
-                      · {centralMosque.district}
+                      {centralMosque.neighbourhood ? `· ${centralMosque.neighbourhood}` : ''}
                     </p>
                   )}
                   {selectedCompetition && (selectedCompetition.startedAt || selectedCompetition.endsAt || selectedCompetition.closedAt) && (
@@ -433,7 +433,7 @@ export default function CompetitionsPage() {
               <option value="">— Seçilmedi —</option>
               {mosques.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.name} ({m.district})
+                  {m.name}
                 </option>
               ))}
             </Select>

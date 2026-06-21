@@ -181,7 +181,7 @@ export default function DashboardOverviewPage() {
                               {m.name}
                             </p>
                             <p className="truncate text-xs text-muted-foreground">
-                              {m.neighbourhood}, {m.district} · {m.city}
+                              {m.neighbourhood}
                             </p>
                           </div>
                           <Badge variant="default" className="shrink-0">

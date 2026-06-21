@@ -32,7 +32,6 @@ export function ImamMosqueApplyModal({
   onSubmitted: () => Promise<void> | void
 }) {
   const [q, setQ] = useState('')
-  const [city, setCity] = useState('')
   const [results, setResults] = useState<Mosque[]>([])
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState<Mosque | null>(null)
@@ -46,7 +45,6 @@ export function ImamMosqueApplyModal({
   useEffect(() => {
     if (open) {
       setQ('')
-      setCity('')
       setResults([])
       setSelected(null)
       setNote('')
@@ -60,8 +58,7 @@ export function ImamMosqueApplyModal({
   useEffect(() => {
     if (!open) return
     const trimmed = q.trim()
-    const cityTrimmed = city.trim()
-    if (!trimmed && !cityTrimmed) {
+    if (!trimmed) {
       setResults([])
       return
     }
@@ -71,7 +68,6 @@ export function ImamMosqueApplyModal({
       try {
         const list = await api.mosques.search({
           q: trimmed || undefined,
-          city: cityTrimmed || undefined,
           limit: 80,
         })
         setResults(list)
@@ -82,7 +78,7 @@ export function ImamMosqueApplyModal({
       }
     }, 350)
     return () => clearTimeout(t)
-  }, [q, city, open])
+  }, [q, open])
 
   // Seçili cami arama sonuçlarında olmasa da listede üstte gösterilsin.
   const displayItems = useMemo(() => {
@@ -138,22 +134,14 @@ export function ImamMosqueApplyModal({
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">
             Cami seç
           </Label>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[2fr_1fr]">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Cami adı ara…"
-                className="pl-9"
-                aria-label="Cami adı"
-              />
-            </div>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="Şehir (örn. İstanbul)"
-              aria-label="Şehir"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Cami adı ara…"
+              className="pl-9"
+              aria-label="Cami adı"
             />
           </div>
 
@@ -164,9 +152,7 @@ export function ImamMosqueApplyModal({
               </div>
             ) : displayItems.length === 0 ? (
               <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-                {q.trim() || city.trim()
-                  ? 'Sonuç bulunamadı.'
-                  : 'Yukarıdan ara — cami adı ya da şehir yaz.'}
+                {q.trim() ? 'Sonuç bulunamadı.' : 'Yukarıdan cami adı yaz.'}
               </p>
             ) : (
               displayItems.map((m) => {
@@ -197,9 +183,7 @@ export function ImamMosqueApplyModal({
                         {m.name}
                       </span>
                       <span className="block truncate text-xs text-muted-foreground">
-                        {[m.neighbourhood, m.district, m.city]
-                          .filter((x) => x && x.trim() && x !== 'Bilinmiyor')
-                          .join(', ') || `${m.city}`}
+                        {m.neighbourhood ?? ''}
                       </span>
                     </span>
                   </button>
