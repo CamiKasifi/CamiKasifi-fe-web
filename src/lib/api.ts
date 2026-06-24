@@ -519,6 +519,13 @@ export const api = {
   users: {
     update: (input: UserUpdateInput) =>
       request<UserProfile>('PUT', '/api/users/me', input),
+    deletionStatus: () =>
+      request<{ pending: boolean; daysLeft?: number | null; requestedAt?: string | null; deleteAt?: string | null }>(
+        'GET',
+        '/api/users/me/deletion-status',
+      ),
+    requestDeletion: () => request<void>('DELETE', '/api/users/me'),
+    cancelDeletion: () => request<void>('DELETE', '/api/users/me/deletion-request'),
   },
   provinces: {
     list: () => request<Province[]>('GET', '/api/provinces'),
