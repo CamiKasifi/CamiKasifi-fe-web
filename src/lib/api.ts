@@ -457,6 +457,10 @@ export interface PointsConfig {
   ishaPoints: number
   fullDayBonus: number
   sameSalahStreakBonus: number
+  /** Vakit girdikten sonraki `onTimeWindowMinutes` içinde check-in yapılırsa
+   * o vaktin temel puanı bu katsayıyla çarpılır ("cemaatle vaktinde"). */
+  onTimeMultiplier: number
+  onTimeWindowMinutes: number
 }
 
 export class ApiError extends Error {

@@ -16,6 +16,19 @@ const FIELDS: { key: keyof PointsConfig; label: string; hint: string }[] = [
   { key: 'sameSalahStreakBonus', label: 'Streak Bonusu', hint: 'Aynı vakti 5 gün üst üste kılınca verilen ek puan' },
 ]
 
+const ON_TIME_FIELDS: { key: keyof PointsConfig; label: string; hint: string }[] = [
+  {
+    key: 'onTimeMultiplier',
+    label: 'Vaktinde Çarpanı',
+    hint: 'Pencere içinde check-in yapılırsa o vaktin temel puanı bu katsayıyla çarpılır',
+  },
+  {
+    key: 'onTimeWindowMinutes',
+    label: 'Pencere (dakika)',
+    hint: 'Vakit başlangıcından itibaren bu süre içinde check-in "vaktinde" sayılır',
+  },
+]
+
 const EMPTY: PointsConfig = {
   fajrPoints: 25,
   dhuhrPoints: 10,
@@ -24,6 +37,8 @@ const EMPTY: PointsConfig = {
   ishaPoints: 15,
   fullDayBonus: 10,
   sameSalahStreakBonus: 10,
+  onTimeMultiplier: 3,
+  onTimeWindowMinutes: 30,
 }
 
 export default function PointsConfigPage() {
@@ -105,6 +120,28 @@ export default function PointsConfigPage() {
                     id={key}
                     type="number"
                     min={0}
+                    value={form[key]}
+                    onChange={(e) => handleChange(key, e.target.value)}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">{hint}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-surface p-6">
+            <h2 className="mb-5 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              Vaktinde Cemaat Bonusu
+            </h2>
+            <div className="grid gap-5 sm:grid-cols-2">
+              {ON_TIME_FIELDS.map(({ key, label, hint }) => (
+                <div key={key} className="space-y-1.5">
+                  <Label htmlFor={key}>{label}</Label>
+                  <Input
+                    id={key}
+                    type="number"
+                    min={key === 'onTimeMultiplier' ? 1 : 0}
                     value={form[key]}
                     onChange={(e) => handleChange(key, e.target.value)}
                     required
